@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "invoice-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "apps/invoice-web/main.py"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "sinobisnis-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "apps/api",
+        "run",
+        "start:dev"
+      ],
+      "port": 4000
+    },
+    {
+      "name": "sinobisnis-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "apps/web",
+        "run",
+        "dev"
+      ],
+      "port": 3001
+    }
+  ]
+}

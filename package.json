@@ -1,0 +1,14 @@
+{
+  "name": "smlgroupid",
+  "private": true,
+  "description": "Monorepo Smlgroupid — apps/web (Next.js), apps/api (NestJS), packages/shared",
+  "scripts": {
+    "install:all": "npm --prefix packages/shared install && npm --prefix packages/shared run build && npm --prefix apps/api install && npm --prefix apps/web install",
+    "build:shared": "npm --prefix packages/shared run build",
+    "db:migrate": "npm --prefix apps/api run db:migrate",
+    "db:seed": "npm --prefix apps/api run db:seed",
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build": "npm run build:shared && npm --prefix apps/api run build && npm --prefix apps/web run build"
+  }
+}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ job.invoice_no or job.key }}{% endblock %}
+{% block content %}
+<p><a href="/">&larr; Kembali</a></p>
+<section class="card" id="job" data-id="{{ job.id }}">
+  <div class="head">
+    <h1 id="title">{{ job.invoice_no or job.key }}</h1>
+    <span class="badge {{ job.status }}" id="status">{{ job.status }}</span>
+  </div>
+
+  <div class="progress" aria-label="Progres lampiran"><div id="bar"></div></div>
+  <p class="muted" id="count"></p>
+
+  <div class="alert" id="error" hidden></div>
+
+  <div class="downloads" id="downloads" hidden>
+    <a class="dl" data-kind="invoice"><strong>Invoice</strong><span>PDF</span></a>
+    <a class="dl" data-kind="merged"><strong>Invoice + lampiran</strong><span>PDF</span></a>
+    <a class="dl" data-kind="zip"><strong>Lampiran</strong><span>ZIP</span></a>
+  </div>
+  <p class="hint" id="expires" hidden></p>
+
+  <details>
+    <summary>Log proses</summary>
+    <pre id="log"></pre>
+  </details>
+</section>
+
+<script>
+(function () {
+  const id = document.getElementById("job").dataset.id;
+  const $ = (x) => document.getElementById(x);
+  const mb = (b) => (b / 1048576).toFixed(1) + " MB";
+
+  async function tick() {
+    let j;
+    try {
+      const r = await fetch("/api/jobs/" + id, {credentials: "same-origin"});
+      if (r.status === 404) { location.href = "/"; return; }
+      j = await r.json();
+    } catch (e) { setTimeout(tick, 3000); return; }
+
+    $("status").textContent = j.status;
+    $("status").className = "badge " + j.status;
+    if (j.invoice_no) $("title").textContent = j.invoice_no;
+    const pct = j.total ? Math.round(100 * j.done / j.total) : (j.status === "selesai" ? 100 : 0);
+    $("bar").style.width = pct + "%";
+    $("count").textContent = j.total ? `Lampiran ${j.done} / ${j.total}` :
+      (j.status === "antri" ? "Menunggu giliran..." : (j.status === "proses" ? "Menyiapkan..." : ""));
+    $("log").textContent = j.log.join("\n");
+
+    if (j.status === "gagal") {
+      $("error").hidden = false;
+      $("error").textContent = j.error || "Proses gagal.";
+      return;
+    }
+    if (j.status === "selesai") {
+      document.querySelectorAll(".dl").forEach((a) => {
+        const f = j.files[a.dataset.kind];
+        if (!f) { a.hidden = true; return; }
+        a.href = `/jobs/${id}/download/${a.dataset.kind}`;
+        a.querySelector("span").textContent = `${a.querySelector("span").textContent.split(" ")[0]} · ${mb(f.size)}`;
+      });
+      $("downloads").hidden = false;
+      $("expires").hidden = false;
+      $("expires").textContent = "File tersedia sampai " +
+        new Date(j.expires * 1000).toLocaleString("id-ID") + ", setelah itu dihapus otomatis.";
+      return;
+    }
+    setTimeout(tick, 1500);
+  }
+  tick();
+})();
+</script>
+{% endblock %}

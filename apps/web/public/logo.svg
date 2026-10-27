@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 60" width="300" height="60">
+  <g transform="translate(4,4)">
+    <path d="M26 2 C14 2 8 14 12 22 L20 16 C18 12 21 8 26 8 C31 8 34 12 32 16 L40 22 C44 14 38 2 26 2Z" fill="#1d5fb4"/>
+    <path d="M4 38 C4 50 16 54 24 50 L20 41 C15 43 10 41 10 36 C10 32 13 29 17 29 L16 20 C9 22 4 29 4 38Z" fill="#2aa889"/>
+    <path d="M48 38 C48 29 43 22 36 20 L35 29 C39 29 42 32 42 36 C42 41 37 43 32 41 L28 50 C36 54 48 50 48 38Z" fill="#ee6c2c"/>
+    <circle cx="26" cy="20" r="5" fill="#1d5fb4"/>
+    <circle cx="17" cy="36" r="5" fill="#2aa889"/>
+    <circle cx="35" cy="36" r="5" fill="#ee6c2c"/>
+  </g>
+  <text x="62" y="28" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#24357a">SINOBISNIS MITRA LESTARI</text>
+  <text x="63" y="45" font-family="Segoe UI, Arial, sans-serif" font-size="10.5" fill="#24357a">More Than Your Ordinary Business Service</text>
+</svg>

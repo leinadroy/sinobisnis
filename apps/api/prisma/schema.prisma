@@ -1,0 +1,452 @@
+// Skema aplikasi Sinobisnis (pengganti sistem GeneXus lama).
+// Konvensi (docs/tech-stack.md): model PascalCase, field camelCase, tabel & kolom snake_case via @@map/@map.
+// Perubahan skema selalu lewat `npx prisma migrate dev`.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────── Security ─────────────────────────
+
+model Role {
+  id    Int        @id @default(autoincrement())
+  name  String     @unique
+  users User[]
+  menus RoleMenu[]
+
+  @@map("roles")
+}
+
+/// Matriks hak akses per role & menu (setara Role Pgmname di production).
+model RoleMenu {
+  roleId    Int     @map("role_id")
+  menuKey   String  @map("menu_key")
+  isActive  Boolean @default(true) @map("is_active")
+  allowEdit Boolean @default(false) @map("allow_edit")
+  role      Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, menuKey])
+  @@map("role_menus")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  fullname     String
+  username     String    @unique
+  email        String?
+  passwordHash String    @map("password_hash")
+  roleId       Int?      @map("role_id")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  role         Role?     @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@map("users")
+}
+
+// ───────────────────────── Master data ─────────────────────────
+
+model Sponsor {
+  id       Int              @id @default(autoincrement())
+  name     String
+  projects SponsorProject[]
+  clients  Client[]
+  invoices Invoice[]
+
+  @@map("sponsors")
+}
+
+model BillTo {
+  id             Int              @id @default(autoincrement())
+  kodePerusahaan String?          @map("kode_perusahaan")
+  companyName    String           @map("company_name")
+  npwp           String?
+  alamat1        String?          @map("alamat_1")
+  alamat2        String?          @map("alamat_2")
+  alamat3        String?          @map("alamat_3")
+  alamat4        String?          @map("alamat_4")
+  projects       SponsorProject[]
+  invoices       Invoice[]
+  kontrak        Kontrak[]
+
+  @@map("bill_to")
+}
+
+model SponsorProject {
+  id        Int      @id @default(autoincrement())
+  sponsorId Int      @map("sponsor_id")
+  name      String
+  billToId  Int?     @map("bill_to_id")
+  sponsor   Sponsor  @relation(fields: [sponsorId], references: [id])
+  billTo    BillTo?  @relation(fields: [billToId], references: [id], onDelete: SetNull)
+  clients   Client[]
+
+  @@map("sponsor_projects")
+}
+
+enum PeriodeUnit {
+  MONTHS
+  DAYS
+}
+
+model Keperluan {
+  id                        Int           @id @default(autoincrement())
+  name                      String
+  periode                   Int           @default(0)
+  periodeIn                 PeriodeUnit   @default(MONTHS) @map("periode_in")
+  sumberData                String        @default("TANGGAL TERBIT DOKUMEN") @map("sumber_data")
+  isActive                  Boolean       @default(true) @map("is_active")
+  harga                     Decimal       @default(0) @db.Decimal(18, 2)
+  reminderPembuatanInvoice  Int?          @default(14) @map("reminder_pembuatan_invoice")
+  reminderPembayaranInvoice Int?          @default(30) @map("reminder_pembayaran_invoice")
+  reminderExpiredDokumen    Int?          @default(60) @map("reminder_expired_dokumen")
+  reminderExpired2nd        Int?          @default(14) @map("reminder_expired_2nd")
+  clients                   Client[]
+  invoiceItems              InvoiceItem[]
+  kontrakItems              KontrakItem[]
+
+  @@map("keperluan")
+}
+
+model BankAccount {
+  id         Int       @id @default(autoincrement())
+  bankName   String    @map("bank_name")
+  branch     String?
+  address    String?   @db.Text
+  swiftcode  String?
+  accountFor String?   @map("account_for")
+  accountNo  String?   @map("account_no")
+  companies  Company[]
+  invoices   Invoice[]
+
+  @@map("bank_accounts")
+}
+
+model Company {
+  id                 Int          @id @default(autoincrement())
+  name               String
+  address            String?      @db.Text
+  lastNo             Int          @default(0) @map("last_no")
+  noFormat           String       @default("{NO}/SML/{ROMAWI}/{YYYY}") @map("no_format")
+  bankAccountId      Int?         @map("bank_account_id")
+  invoiceInformation String?      @map("invoice_information") @db.Text
+  signedBy           String?      @map("signed_by")
+  signedTitle        String?      @default("Finance") @map("signed_title")
+  bankAccount        BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  invoices           Invoice[]
+
+  @@map("companies")
+}
+
+enum TaxType {
+  ADDITION
+  REDUCTION
+}
+
+model Tax {
+  id           Int          @id @default(autoincrement())
+  name         String
+  percentage   Decimal      @db.Decimal(6, 3)
+  type         TaxType      @default(ADDITION) @map("addition_reduction")
+  invoiceTaxes InvoiceTax[]
+
+  @@map("taxes")
+}
+
+// ───────────────────────── Client ─────────────────────────
+
+model Client {
+  id                       Int                  @id @default(autoincrement())
+  tanggalPermohonan        DateTime?            @map("tanggal_permohonan") @db.Date
+  sponsorId                Int?                 @map("sponsor_id")
+  projectId                Int?                 @map("project_id")
+  name                     String
+  noPaspor                 String?              @map("no_paspor")
+  tanggalLahir             DateTime?            @map("tanggal_lahir") @db.Date
+  keperluanId              Int?                 @map("keperluan_id")
+  noRptka                  String?              @map("no_rptka")
+  pembayaranPnbp           DateTime?            @map("pembayaran_pnbp") @db.Date
+  permohonanHariKe3        String?              @map("permohonan_hari_ke3")
+  tanggalProsesSelesai     DateTime?            @map("tanggal_proses_selesai") @db.Date
+  tanggalTerbitDokumen     DateTime?            @map("tanggal_terbit_dokumen") @db.Date
+  tanggalMasukLastExp      DateTime?            @map("tanggal_masuk_last_exp") @db.Date
+  expiredDokumen           DateTime?            @map("expired_dokumen") @db.Date
+  epo                      String?
+  noInvoice                String?              @map("no_invoice")
+  tanggalInvoice           DateTime?            @map("tanggal_invoice") @db.Date
+  tanggalPembayaranInvoice DateTime?            @map("tanggal_pembayaran_invoice") @db.Date
+  prosesPerpanjangan       String?              @map("proses_perpanjangan")
+  sktt                     String?
+  stm                      String?
+  status                   String?
+  keteranganTka            String?              @map("keterangan_tka") @db.Text
+  isArchived               Boolean              @default(false) @map("is_archived")
+  archivedReason           String?              @map("archived_reason")
+  invoiceId                Int?                 @map("invoice_id")
+  createdAt                DateTime             @default(now()) @map("created_at")
+  updatedAt                DateTime             @updatedAt @map("updated_at")
+  sponsor                  Sponsor?             @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+  project                  SponsorProject?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  keperluan                Keperluan?           @relation(fields: [keperluanId], references: [id], onDelete: SetNull)
+  invoice                  Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  attachments              ClientAttachment[]
+  conversations            Conversation[]
+  invoiceGroups            InvoiceGroupClient[]
+
+  @@index([name])
+  @@index([noPaspor])
+  @@index([expiredDokumen])
+  @@index([isArchived])
+  @@map("clients")
+}
+
+model ClientAttachment {
+  id           Int      @id @default(autoincrement())
+  clientId     Int      @map("client_id")
+  originalName String   @map("original_name")
+  storedName   String   @map("stored_name")
+  mime         String?
+  size         Int?
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_attachments")
+}
+
+/// Audit perubahan data client (snapshot JSON per aksi).
+model ClientLog {
+  id          Int      @id @default(autoincrement())
+  historyDate DateTime @default(now()) @map("history_date")
+  userName    String?  @map("user_name")
+  clientId    Int?     @map("client_id")
+  action      String
+  snapshot    Json?
+
+  @@index([clientId])
+  @@map("client_logs")
+}
+
+model Conversation {
+  id        Int      @id @default(autoincrement())
+  clientId  Int      @map("client_id")
+  userName  String?  @map("user_name")
+  message   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("conversations")
+}
+
+// ───────────────────────── Invoice ─────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  FINAL
+  PAID
+}
+
+model Invoice {
+  id             Int                 @id @default(autoincrement())
+  no             String?             @unique
+  companyId      Int?                @map("company_id")
+  sponsorId      Int?                @map("sponsor_id")
+  billToId       Int?                @map("bill_to_id")
+  npwp           String?
+  date           DateTime?           @db.Date
+  paidDate       DateTime?           @map("paid_date") @db.Date
+  status         InvoiceStatus       @default(DRAFT)
+  subTotal       Decimal             @default(0) @map("sub_total") @db.Decimal(18, 2)
+  total          Decimal             @default(0) @db.Decimal(18, 2)
+  totalTerbilang String?             @map("total_terbilang") @db.Text
+  information    String?             @db.Text
+  bankAccountId  Int?                @map("bank_account_id")
+  createdBy      String?             @map("created_by")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  company        Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  sponsor        Sponsor?            @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
+  billTo         BillTo?             @relation(fields: [billToId], references: [id], onDelete: SetNull)
+  bankAccount    BankAccount?        @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  groups         InvoiceGroup[]
+  items          InvoiceItem[]
+  taxes          InvoiceTax[]
+  attachments    InvoiceAttachment[]
+  updateRequests UpdateRequest[]
+  clients        Client[]
+
+  @@map("invoices")
+}
+
+/// Satu grup = sekelompok client yang ditagih dengan item layanan yang sama (nomor baris di cetakan).
+model InvoiceGroup {
+  id        Int                  @id @default(autoincrement())
+  invoiceId Int                  @map("invoice_id")
+  seq       Int                  @default(0)
+  invoice   Invoice              @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  items     InvoiceItem[]
+  clients   InvoiceGroupClient[]
+
+  @@map("invoice_groups")
+}
+
+model InvoiceGroupClient {
+  groupId  Int          @map("group_id")
+  clientId Int          @map("client_id")
+  seq      Int          @default(0)
+  group    InvoiceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  client   Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, clientId])
+  @@map("invoice_group_clients")
+}
+
+model InvoiceItem {
+  id          Int          @id @default(autoincrement())
+  groupId     Int          @map("group_id")
+  invoiceId   Int          @map("invoice_id")
+  seq         Int          @default(0)
+  description String
+  keperluanId Int?         @map("keperluan_id")
+  qty         Decimal      @default(1) @db.Decimal(12, 2)
+  unitPrice   Decimal      @default(0) @map("unit_price") @db.Decimal(18, 2)
+  subTotal    Decimal      @default(0) @map("sub_total") @db.Decimal(18, 2)
+  group       InvoiceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  keperluan   Keperluan?   @relation(fields: [keperluanId], references: [id], onDelete: SetNull)
+
+  @@map("invoice_items")
+}
+
+model InvoiceTax {
+  id          Int     @id @default(autoincrement())
+  invoiceId   Int     @map("invoice_id")
+  taxId       Int?    @map("tax_id")
+  description String
+  value       Decimal @default(0) @db.Decimal(18, 2)
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tax         Tax?    @relation(fields: [taxId], references: [id], onDelete: SetNull)
+
+  @@map("invoice_taxes")
+}
+
+model InvoiceAttachment {
+  id           Int      @id @default(autoincrement())
+  invoiceId    Int      @map("invoice_id")
+  originalName String   @map("original_name")
+  storedName   String   @map("stored_name")
+  mime         String?
+  size         Int?
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_attachments")
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  DONE
+}
+
+/// Izin edit invoice yang sudah FINAL/PAID.
+model UpdateRequest {
+  id          Int           @id @default(autoincrement())
+  invoiceId   Int           @map("invoice_id")
+  status      RequestStatus @default(PENDING)
+  reason      String?       @db.Text
+  requestedBy String?       @map("requested_by")
+  decidedBy   String?       @map("decided_by")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime?     @map("updated_at")
+  invoice     Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("update_requests")
+}
+
+/// Daftar harga per Bill To; kontrak terbaru yang berlaku dipakai saat Create Invoice.
+model Kontrak {
+  id       Int           @id @default(autoincrement())
+  date     DateTime?     @db.Date
+  billToId Int           @map("bill_to_id")
+  alamat   String?
+  isi      String?       @db.Text
+  billTo   BillTo        @relation(fields: [billToId], references: [id])
+  items    KontrakItem[]
+
+  @@map("kontrak")
+}
+
+model KontrakItem {
+  id          Int        @id @default(autoincrement())
+  kontrakId   Int        @map("kontrak_id")
+  seq         Int        @default(0)
+  keperluanId Int?       @map("keperluan_id")
+  description String
+  duration    String?
+  price       Decimal    @default(0) @db.Decimal(18, 2)
+  kontrak     Kontrak    @relation(fields: [kontrakId], references: [id], onDelete: Cascade)
+  keperluan   Keperluan? @relation(fields: [keperluanId], references: [id], onDelete: SetNull)
+
+  @@map("kontrak_items")
+}
+
+// ───────────────────────── Email reminder & sistem ─────────────────────────
+
+model EmailTemplate {
+  id          Int     @id @default(autoincrement())
+  code        String  @unique
+  description String?
+  subject     String?
+  body        String? @db.Text
+
+  @@map("email_templates")
+}
+
+enum RecipientType {
+  TO
+  CC
+  BCC
+}
+
+model EmailRecipient {
+  id           Int           @id @default(autoincrement())
+  name         String?
+  email        String
+  type         RecipientType @default(TO)
+  /// Penerima reminder invoice (Pembuatan & Pembayaran Invoice).
+  isAccounting Boolean       @default(false) @map("is_accounting")
+  isActive     Boolean       @default(true) @map("is_active")
+
+  @@map("email_recipients")
+}
+
+model ReminderLog {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now()) @map("created_at")
+  type       String
+  refKey     String?  @map("ref_key")
+  subject    String?
+  recipients String?  @db.Text
+  itemCount  Int?     @map("item_count")
+  status     String?
+  error      String?  @db.Text
+
+  @@index([refKey])
+  @@map("reminder_logs")
+}
+
+model SystemConfig {
+  key   String  @id
+  value String? @db.Text
+
+  @@map("system_config")
+}

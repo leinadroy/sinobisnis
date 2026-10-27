@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Invoice Printer{% endblock %} · Sinobisnis Group</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="/">Invoice Printer</a>
+      {% if user %}
+      <form method="post" action="/logout" class="logout">
+        <span class="who">{{ fullname }}</span>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn-link" type="submit">Keluar</button>
+      </form>
+      {% endif %}
+    </div>
+  </header>
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

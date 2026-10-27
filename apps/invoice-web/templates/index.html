@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>Cetak invoice</h1>
+  <p class="muted">Masukkan nomor invoice (mis. <code>26351/SML/X/2026</code>) atau InvoiceId (mis. <code>2334</code>).
+    Model SML, RTS, atau JCSS dipilih otomatis dari nomornya.</p>
+  <form method="post" action="/jobs" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="invoice" placeholder="No invoice / InvoiceId" required autofocus aria-label="Nomor invoice">
+    <button class="btn" type="submit">Proses</button>
+  </form>
+  <p class="hint">Hasil: PDF invoice, PDF invoice + semua lampiran, dan ZIP lampiran.
+    File dihapus otomatis setelah {{ ttl|int }} jam.</p>
+</section>
+
+{% if recent %}
+<section class="card">
+  <h2>Proses terakhir</h2>
+  <table class="list">
+    <thead><tr><th>Invoice</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for j in recent %}
+      <tr>
+        <td>{{ j.invoice_no or j.key }}</td>
+        <td><span class="badge {{ j.status }}">{{ j.status }}</span></td>
+        <td class="right"><a href="/jobs/{{ j.id }}">Buka</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

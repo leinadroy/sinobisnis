@@ -1,0 +1,7 @@
+
+# Prisma
+/src/generated/
+.env
+
+# Lampiran upload (data pribadi: paspor dll.)
+storage/

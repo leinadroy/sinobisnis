@@ -1,11 +1,48 @@
-# generated files
+# ── Rahasia ──────────────────────────────────────────────
+# Kredensial MariaDB production, PostgreSQL lokal, JWT secret. Template tetap di-commit.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Data pribadi (paspor, invoice asli, lampiran) ─────────
+# Repo ini PUBLIK: jangan pernah commit dokumen client.
+output/
+apps/invoice-printer/hasil/
+apps/invoice-web/data/
+apps/api/storage/
+# Contoh invoice asli (berisi nama TKA) dipakai sebagai acuan layout secara lokal saja.
+*.pdf
+*.zip
+*.csv
+*.xlsx
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Dependensi & hasil build ───────────────────────────────
+node_modules/
+.next/
+dist/
+out/
+coverage/
+apps/api/src/generated/
+*.tsbuildinfo
+next-env.d.ts
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── Editor / OS / lokal Claude ────────────────────────────
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
+npm-debug.log*
+
+# ── Dari template awal repo ───────────────────────────────
 target/
 generated/
-
-# dependencies
 Dependencies.toml
-
-# config files
 Config.toml
-# the config files used for testing, Uncomment the following line if you want to commit the test config files
-#!**/tests/Config.toml

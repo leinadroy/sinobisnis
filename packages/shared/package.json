@@ -1,0 +1,25 @@
+{
+  "name": "@sml/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Type, DTO, dan definisi menu/hak akses yang dipakai apps/web dan apps/api",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  }
+}
