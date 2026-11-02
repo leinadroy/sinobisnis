@@ -124,4 +124,5 @@ export interface MasterOptions {
   projects: { id: number; name: string; sponsorId: number; billToId: number | null }[];
   keperluan: { id: number; name: string; periode: number; periodeIn: string; sumberData: string; harga: number; isActive: boolean }[];
   taxes: { id: number; name: string; percentage: number; type: string }[];
+  companies: { id: number; name: string; bankAccountId: number | null }[];
 }

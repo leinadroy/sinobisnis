@@ -7,6 +7,7 @@ import {
 } from '@sml/shared';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { d2s, s2d } from '../common/dates.js';
 import { ListQueryDto, paginated } from '../common/list-query.dto.js';
 import type { ClientDto, ClientListQueryDto } from './clients.dto.js';
 
@@ -20,9 +21,6 @@ const include = {
   _count: { select: { attachments: true } },
 } satisfies Prisma.ClientInclude;
 type ClientWithRel = Prisma.ClientGetPayload<{ include: typeof include }>;
-
-const d2s = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
-const s2d = (s: string | null | undefined) => (s ? new Date(s + 'T00:00:00Z') : null);
 
 export function toRow(c: ClientWithRel): ClientRow {
   const dates = Object.fromEntries(CLIENT_DATE_FIELDS.map((f) => [f, d2s(c[f])]));
@@ -165,7 +163,8 @@ export class ClientsService {
     return data;
   }
 
-  private async log(userName: string, clientId: number, action: string) {
+  /** Catat aksi client beserta snapshot datanya (juga dipakai modul Invoice saat client masuk/keluar invoice). */
+  async log(userName: string, clientId: number, action: string) {
     const c = await this.prisma.client.findUnique({ where: { id: clientId }, include });
     await this.prisma.clientLog.create({
       data: { userName, clientId, action, snapshot: c ? (toRow(c) as unknown as Prisma.InputJsonValue) : Prisma.JsonNull },

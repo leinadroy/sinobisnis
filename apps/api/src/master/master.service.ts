@@ -88,15 +88,16 @@ export class MasterService {
     }
   }
 
-  /** Pilihan dropdown untuk semua form (client, master, invoice). */
+  /** Pilihan dropdown untuk semua form (client, master, invoice, kontrak). */
   async options(): Promise<MasterOptions> {
-    const [sponsors, billTos, banks, projects, keperluan, taxes] = await Promise.all([
+    const [sponsors, billTos, banks, projects, keperluan, taxes, companies] = await Promise.all([
       this.prisma.sponsor.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       this.prisma.billTo.findMany({ orderBy: { companyName: 'asc' }, select: { id: true, companyName: true, npwp: true } }),
       this.prisma.bankAccount.findMany({ orderBy: { bankName: 'asc' }, select: { id: true, bankName: true, accountNo: true } }),
       this.prisma.sponsorProject.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, sponsorId: true, billToId: true } }),
       this.prisma.keperluan.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.tax.findMany({ orderBy: { id: 'asc' } }),
+      this.prisma.company.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, bankAccountId: true } }),
     ]);
     return {
       sponsors,
@@ -107,6 +108,7 @@ export class MasterService {
         id: k.id, name: k.name, periode: k.periode, periodeIn: k.periodeIn, sumberData: k.sumberData, harga: k.harga.toNumber(), isActive: k.isActive,
       })),
       taxes: taxes.map((t) => ({ id: t.id, name: t.name, percentage: t.percentage.toNumber(), type: t.type })),
+      companies,
     };
   }
 

@@ -13,7 +13,7 @@ Standar: [`docs/tech-stack.md`](../../docs/tech-stack.md).
 |---|---|---|
 | 1 | Skema Prisma semua modul, login JWT, Users, Role, Hak Akses Role | ✅ |
 | 2 | Master data (7 entitas) + Client (list/filter, form, lampiran, arsip, conversation, Client List, log, export CSV) | ✅ |
-| 3 | Invoice (grup → item, pajak, Request To Edit), Kontrak, cetak invoice | belum |
+| 3 | Invoice (Create Invoice, grup → item, pajak, lampiran, export), Update Request (Request To Edit), Kontrak, cetak invoice | ✅ |
 | 4 | Email reminder + penjadwal | belum |
 | 5 | Migrasi data dari MariaDB production (read-only) | belum |
 
@@ -77,7 +77,9 @@ src/
 ├── users/                   # CRUD user
 ├── roles/                   # CRUD role + matriks hak akses (/role-access/:roleId)
 ├── master/                  # master data generik: config per entitas + DTO class-validator
-└── clients/                 # client, arsip, Client List, log, lampiran (multer), conversation, export CSV
+├── clients/                 # client, arsip, Client List, log, lampiran (multer), conversation, export CSV
+├── kontrak/                 # daftar harga per Bill To + priceList() (dipakai Create Invoice)
+└── invoices/                # invoice, Create Invoice, Update Request, lampiran, export CSV, data cetak
 prisma/
 ├── schema.prisma            # skema lengkap semua modul
 ├── migrations/              # 20261027055953_init
@@ -106,6 +108,15 @@ Semua di bawah prefix `/api`. Dokumentasi lengkap & coba langsung: `/api/docs` (
 | `POST /clients/:id/conversations` | `clients` (**lihat** cukup) | Catatan per client, seperti production |
 | `POST /clients/:id/attachments` | `clients` | Multipart field `files` (maks 20 file × 20 MB) |
 | `GET /clients/attachments/:aid/file`, `DELETE /clients/attachments/:aid` | `clients` | Unduh / hapus lampiran |
+| `GET /invoices`, `GET /invoices/export` | `invoices` | List + filter `status`, `from`/`to` (invoice date), `sponsorId`, `billToId`; response list ditambah `amount` (jumlah total sesuai filter). Search ikut mencari nama/paspor client |
+| `GET /invoices/invoiceable-clients` | `invoices` **atau** `invoices.create` (lihat) | Client belum ber-invoice & tidak diarsip (maks 500): `sponsorId`, `projectId`, `billToId` (project), `search` |
+| `GET /invoices/price-list?billToId&date` | `invoices` (lihat) | Harga Kontrak yang berlaku |
+| `POST /invoices` | `invoices.create` | `{ clientIds, companyId, billToId? }` → invoice DRAFT; balasan `{ id, no, missingPrice }` |
+| `GET/PUT/DELETE /invoices/:id`, `GET /invoices/:id/print` | `invoices` | PUT = simpan seluruh header + grup + item + pajak sekaligus |
+| `POST /invoices/:id/attachments`, `GET /invoices/attachments/:aid/file`, `DELETE /invoices/attachments/:aid` | `invoices` | Tambah/hapus hanya saat invoice bisa diedit |
+| `POST /invoices/:id/request-edit` (`{ reason }`), `POST /invoices/:id/cancel-request` | `invoices` | Izin edit invoice FINAL/PAID |
+| `GET /invoices/requests`, `POST /invoices/requests/:rid/approve\|reject` | `invoices.requests` | Lihat / putuskan Update Request |
+| `GET/POST /kontrak`, `GET/PUT/DELETE /kontrak/:id` | `kontrak` | PUT = ganti header + seluruh item harga |
 
 ## Hak akses
 
@@ -125,6 +136,38 @@ Semua di bawah prefix `/api`. Dokumentasi lengkap & coba langsung: `/api/docs` (
 - Client yang sudah terhubung ke invoice tidak bisa dihapus.
 - Setiap insert/update/delete/arsip/lampiran dicatat di `client_logs` beserta snapshot data.
 - Tanggal dikirim/diterima sebagai `YYYY-MM-DD` (kolom `@db.Date`, disimpan UTC tengah malam).
+
+## Aturan bisnis Invoice & Kontrak
+
+- **Create Invoice**: hanya client yang tidak diarsip, belum terhubung ke invoice, dan kolom No Invoice-nya kosong.
+  Nomor dari `Company.noFormat` dengan `lastNo` dinaikkan secara atomik di transaksi yang sama (dua user bersamaan
+  tidak mendapat nomor sama; bila gagal, `lastNo` ikut batal). Tanggal = hari ini, Bill To = pilihan user atau Bill To
+  project client pertama (NPWP ikut), bank & Important Information dari Company (cadangan: config
+  `DEFAULT_ADDITIONAL_INFORMATION`). Satu grup per Keperluan, pax = jumlah client, harga dari Kontrak Bill To
+  (`priceList`), cadangan harga default Keperluan; `missingPrice` = jumlah grup yang tetap 0.
+- **Simpan (PUT)**: item kosong dan grup tanpa item/client dibuang; satu client hanya boleh di satu grup dan tidak boleh
+  milik invoice lain. Sub total, nilai pajak master (persentase × sub total, REDUCTION negatif, dibulatkan rupiah),
+  total, dan terbilang dihitung API dengan `computeInvoiceTotals` (`packages/shared/src/invoice.ts`, dipakai juga web
+  untuk total di form). Baris pajak "Other" (tanpa taxId) memakai nilai isian.
+- Status **FINAL/PAID** wajib punya No, Date, Company, Bill To, dan minimal satu item. Paid Date hanya disimpan saat
+  PAID (kosong → hari ini).
+- Kolom `noInvoice`, `tanggalInvoice`, `tanggalPembayaranInvoice`, `invoiceId` di client selalu disinkronkan oleh
+  modul ini (client keluar dari invoice → dikosongkan); tiap perubahan dicatat di `client_logs` (`INVOICE`,
+  `INVOICE_UPDATE`, `INVOICE_REMOVE`).
+- **Terkunci**: invoice bisa diedit bila DRAFT atau Update Request terakhir APPROVED. Izin itu hanya untuk satu kali
+  simpan (request → DONE). Hanya satu request PENDING/APPROVED per invoice. Peminta tidak boleh memutuskan request-nya
+  sendiri, kecuali role Developer.
+- **Hapus invoice**: DRAFT oleh pemegang edit `invoices`; FINAL/PAID hanya oleh pemegang edit `invoices.requests`.
+  `lastNo` Company tidak dikembalikan (sama seperti production).
+- **Kontrak**: nama item kosong = nama Keperluan, alamat kosong = alamat Bill To, nama layanan tidak boleh ganda dalam
+  satu kontrak. `priceList(billTo, date)` = item dari kontrak terbaru dengan tanggal ≤ date per nama layanan (kontrak
+  tanpa tanggal dianggap paling lama).
+- **Cetak**: halaman web `/print/invoices/:id` (A4, Print / Simpan PDF lewat browser) memakai `GET /invoices/:id/print`;
+  penanda tangan = `Company.signedBy`, cadangan config `DISETUJUI_OLEH`.
+
+## Test
+
+- `npm test` — unit test aturan hitung invoice (`src/invoices/invoice-calc.spec.ts`).
 
 ## Catatan teknis
 
