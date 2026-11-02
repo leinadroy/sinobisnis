@@ -1,6 +1,8 @@
 // Definisi master data: dipakai web (form & kolom generik) dan api (key menu, slug endpoint).
 // Slug = key menu = segmen URL (/master/<slug>, API /api/master/<slug>).
 
+import { REMINDER_TYPES } from './reminder.js';
+
 export type FieldType = 'text' | 'textarea' | 'number' | 'checkbox' | 'select' | 'ref';
 export type RefSource = 'sponsors' | 'billTos' | 'bankAccounts';
 
@@ -20,6 +22,8 @@ export interface MasterField {
   /** Bisa di-sort di list. */
   sortable?: boolean;
   help?: string;
+  /** Checkbox: tidak tercentang saat Insert (default tercentang). */
+  defaultOff?: boolean;
 }
 
 export interface MasterEntity {
@@ -111,6 +115,28 @@ export const MASTER_ENTITIES: MasterEntity[] = [
       { name: 'name', label: 'Name', type: 'text', required: true, sortable: true },
       { name: 'percentage', label: 'Percentage', type: 'number', required: true, sortable: true },
       { name: 'type', label: 'Addition / Reduction', type: 'select', options: [...TAX_TYPES], sortable: true },
+    ],
+  },
+  // Developer Menu: memakai halaman & endpoint master generik.
+  {
+    slug: 'email-templates', title: 'Email Template', titleField: 'code',
+    help: 'Code = kategori reminder. Placeholder {{TABLE}} di Body diganti tabel daftar client; subject otomatis ditambah jumlah client & tanggal.',
+    fields: [
+      { name: 'code', label: 'Code', type: 'select', required: true, options: [...REMINDER_TYPES], sortable: true },
+      { name: 'description', label: 'Template Description', type: 'text', sortable: true },
+      { name: 'subject', label: 'Template Subject', type: 'text' },
+      { name: 'body', label: 'Body (HTML)', type: 'textarea', help: 'HTML email. Wajib memuat {{TABLE}}.' },
+    ],
+  },
+  {
+    slug: 'email-recipients', title: 'Email Recipient', titleField: 'email',
+    help: 'Penerima bertanda Accounting menerima reminder invoice (Pembuatan & Pembayaran Invoice); lainnya menerima reminder dokumen (Expired, Expired ke-2, EPO). Bila satu kelompok belum punya penerima TO, dipakai kelompok lainnya.',
+    fields: [
+      { name: 'name', label: 'Name', type: 'text', sortable: true },
+      { name: 'email', label: 'Email', type: 'text', required: true, sortable: true },
+      { name: 'type', label: 'Type', type: 'select', options: ['TO', 'CC', 'BCC'], sortable: true },
+      { name: 'isAccounting', label: 'Accounting', type: 'checkbox', sortable: true, defaultOff: true },
+      { name: 'isActive', label: 'Is Active', type: 'checkbox', sortable: true },
     ],
   },
 ];

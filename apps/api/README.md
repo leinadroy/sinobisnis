@@ -14,7 +14,7 @@ Standar: [`docs/tech-stack.md`](../../docs/tech-stack.md).
 | 1 | Skema Prisma semua modul, login JWT, Users, Role, Hak Akses Role | ✅ |
 | 2 | Master data (7 entitas) + Client (list/filter, form, lampiran, arsip, conversation, Client List, log, export CSV) | ✅ |
 | 3 | Invoice (Create Invoice, grup → item, pajak, lampiran, export), Update Request (Request To Edit), Kontrak, cetak invoice | ✅ |
-| 4 | Email reminder + penjadwal | belum |
+| 4 | Email Reminder (5 kategori, kirim manual/paksa, Notification Log) + penjadwal otomatis; Developer Menu: Email Template, Email Recipient, System Configurator | ✅ |
 | 5 | Migrasi data dari MariaDB production (read-only) | belum |
 
 ## Setup pertama
@@ -53,6 +53,7 @@ User awal dari seed memakai `ADMIN_USERNAME` / `ADMIN_PASSWORD` di `.env` (role 
 | `PORT`, `WEB_ORIGIN` | Port API (4000) & origin web untuk CORS |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Admin awal saat seed (hanya bila belum ada user) |
 | `UPLOAD_DIR` | Folder lampiran (default `storage/uploads`, relatif terhadap folder kerja API; di-gitignore) |
+| `REMINDER_SCHEDULER` | `off` = matikan penjadwal reminder di instance ini (pakai bila API dijalankan lebih dari satu) |
 
 ### Masalah yang diketahui di PC development
 
@@ -79,7 +80,8 @@ src/
 ├── master/                  # master data generik: config per entitas + DTO class-validator
 ├── clients/                 # client, arsip, Client List, log, lampiran (multer), conversation, export CSV
 ├── kontrak/                 # daftar harga per Bill To + priceList() (dipakai Create Invoice)
-└── invoices/                # invoice, Create Invoice, Update Request, lampiran, export CSV, data cetak
+├── invoices/                # invoice, Create Invoice, Update Request, lampiran, export CSV, data cetak
+└── reminders/               # Email Reminder (reminder.logic.ts = aturan murni), penjadwal croner, kirim nodemailer, System Configurator
 prisma/
 ├── schema.prisma            # skema lengkap semua modul
 ├── migrations/              # 20261027055953_init
@@ -117,6 +119,11 @@ Semua di bawah prefix `/api`. Dokumentasi lengkap & coba langsung: `/api/docs` (
 | `POST /invoices/:id/request-edit` (`{ reason }`), `POST /invoices/:id/cancel-request` | `invoices` | Izin edit invoice FINAL/PAID |
 | `GET /invoices/requests`, `POST /invoices/requests/:rid/approve\|reject` | `invoices.requests` | Lihat / putuskan Update Request |
 | `GET/POST /kontrak`, `GET/PUT/DELETE /kontrak/:id` | `kontrak` | PUT = ganti header + seluruh item harga |
+| `GET /reminders` | `reminders` | Jumlah per kategori, status jadwal (cron, zona waktu, berikutnya), kesiapan SMTP & penerima |
+| `GET /reminders/items?type=`, `GET /reminders/logs` | `reminders` | Daftar client per kategori; Notification Log (filter `status`, `type`, `search`) |
+| `POST /reminders/run` (`{ force? }`), `POST /reminders/reload-schedule` | `reminders` (edit) | Kirim sekarang / kirim ulang paksa; muat ulang jadwal |
+| `/master/email-templates`, `/master/email-recipients` | slug yang sama | Lewat master generik |
+| `GET/POST /system-config`, `PUT/DELETE /system-config/:key`, `POST /system-config/test-email` | `system-config` | Nilai key rahasia (`SMTP_PASSWORD`, `*SECRET*`, `*TOKEN*`) tidak pernah dikirim balik; key bawaan tidak bisa dihapus |
 
 ## Hak akses
 
@@ -165,9 +172,32 @@ Semua di bawah prefix `/api`. Dokumentasi lengkap & coba langsung: `/api/docs` (
 - **Cetak**: halaman web `/print/invoices/:id` (A4, Print / Simpan PDF lewat browser) memakai `GET /invoices/:id/print`;
   penanda tangan = `Company.signedBy`, cadangan config `DISETUJUI_OLEH`.
 
+## Aturan bisnis Email Reminder
+
+- Kategori (`categorize()` di `src/reminders/reminder.logic.ts`, hari dihitung dari tanggal server):
+  - **Reminder ke-2 expired**: sisa hari ≤ Reminder Expired ke-2 Keperluan (kosong → config `EXPIRED_SECOND_REMINDER_DAYS`, default 14), termasuk yang sudah lewat.
+  - **Dokumen akan expired**: sisa hari ≤ Reminder Expired Keperluan (default 60) dan belum masuk kategori ke-2.
+    Kedua kategori expired dilewati selama Proses Perpanjangan terisi.
+  - **Belum dibuat invoice**: selesai diproses ≥ Reminder Pembuatan Invoice hari (default 14), belum punya invoice.
+  - **Invoice belum dibayar**: invoice berumur ≥ Reminder Pembayaran Invoice hari (default 30), belum ada tanggal pembayaran.
+  - **Perlu EPO**: Keperluan bernama EPO / Exit Permit yang belum selesai diproses.
+  - Nilai 0 di reminder invoice Keperluan menonaktifkan kategori itu. Client yang diarsip tidak ikut.
+- Satu email per kategori yang punya client, memakai Email Template dengan `code` = kategori (`{{TABLE}}` diganti
+  tabel client dengan link `SITE_URL/clients/:id`; nilai di-escape). Subject = subject template + `(N client) - tanggal`.
+- Penerima: kategori invoice → Email Recipient bertanda Accounting, lainnya → penerima umum; bila kelompok itu tidak
+  punya penerima TO aktif, dipakai kelompok lainnya.
+- Satu kategori hanya terkirim sekali per hari (`reminder_logs.ref_key = TYPE:YYYY-MM-DD` berstatus SENT) kecuali
+  "Kirim ulang (paksa)". Setiap percobaan dicatat: SENT, NOT SENT (SMTP/penerima belum ada), FAILED (+ pesan error).
+  Dua pengiriman bersamaan di satu proses ditolak (409).
+- **Penjadwal**: croner di dalam proses API, dari config `REMINDER_ENABLED` (1/0), `REMINDER_CRON` (default
+  `0 8 * * 1-5`), `REMINDER_TIMEZONE` (default `Asia/Jakarta`). Mengubah key itu lewat System Configurator memuat ulang
+  jadwal saat itu juga. Cron tidak valid dilaporkan di halaman Email Reminder.
+- Library dikunci ke versi yang sudah ≥ 2 minggu dirilis: `nodemailer@10.1.7`, `croner@10.0.1`.
+
 ## Test
 
-- `npm test` — unit test aturan hitung invoice (`src/invoices/invoice-calc.spec.ts`).
+- `npm test` — unit test aturan hitung invoice (`src/invoices/invoice-calc.spec.ts`) dan aturan reminder
+  (`src/reminders/reminder.logic.spec.ts`).
 
 ## Catatan teknis
 

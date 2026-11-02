@@ -1,13 +1,15 @@
 import type { ClassConstructor } from 'class-transformer';
 import type { Prisma } from '../generated/prisma/client.js';
-import { BankAccountDto, BillToDto, CompanyDto, KeperluanDto, SponsorDto, SponsorProjectDto, TaxDto } from './master.dto.js';
+import {
+  BankAccountDto, BillToDto, CompanyDto, EmailRecipientDto, EmailTemplateDto, KeperluanDto, SponsorDto, SponsorProjectDto, TaxDto,
+} from './master.dto.js';
 
 type Order = Prisma.SortOrder;
 type Row = Record<string, any>;
 
 export interface MasterApiConfig {
   /** Nama delegate Prisma Client (prisma.<model>). */
-  model: 'sponsor' | 'sponsorProject' | 'billTo' | 'keperluan' | 'company' | 'bankAccount' | 'tax';
+  model: 'sponsor' | 'sponsorProject' | 'billTo' | 'keperluan' | 'company' | 'bankAccount' | 'tax' | 'emailTemplate' | 'emailRecipient';
   dto: ClassConstructor<object>;
   /** Filter pencarian teks bebas. */
   search: (s: string) => Row[];
@@ -61,5 +63,15 @@ export const MASTER_API: Record<string, MasterApiConfig> = {
     model: 'tax', dto: TaxDto, defaultSort: 'name',
     search: (s) => [ci('name')(s)],
     sort: { name: by('name'), percentage: by('percentage'), type: by('type') },
+  },
+  'email-templates': {
+    model: 'emailTemplate', dto: EmailTemplateDto, defaultSort: 'code',
+    search: (s) => ['code', 'description', 'subject'].map((f) => ci(f)(s)),
+    sort: { code: by('code'), description: by('description') },
+  },
+  'email-recipients': {
+    model: 'emailRecipient', dto: EmailRecipientDto, defaultSort: 'email',
+    search: (s) => ['name', 'email'].map((f) => ci(f)(s)),
+    sort: { name: by('name'), email: by('email'), type: by('type'), isAccounting: by('isAccounting'), isActive: by('isActive') },
   },
 };
