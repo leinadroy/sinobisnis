@@ -65,8 +65,8 @@ export const MENU: MenuEntry[] = [
     label: 'Developer Menu',
     icon: 'code',
     children: [
-      { key: 'email-templates', label: 'Email Template', href: '/developer/email-templates' },
-      { key: 'email-recipients', label: 'Email Recipient', href: '/developer/email-recipients' },
+      { key: 'email-templates', label: 'Email Template', href: '/master/email-templates' },
+      { key: 'email-recipients', label: 'Email Recipient', href: '/master/email-recipients' },
       { key: 'system-config', label: 'System Configurator', href: '/developer/system-config' },
     ],
   },

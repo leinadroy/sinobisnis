@@ -65,8 +65,8 @@ async function main() {
   }
 
   const config: Record<string, string> = {
-    SITE_URL: 'http://localhost:3000', SMTP_HOST: '', SMTP_PORT: '587', SMTP_SECURE: '0', SMTP_USERNAME: '',
-    SMTP_PASSWORD: '', SMTP_FROM: '', REMINDER_CRON: '0 8 * * 1-5', REMINDER_ENABLED: '0', EXPIRED_SECOND_REMINDER_DAYS: '14',
+    SITE_URL: 'http://localhost:3001', SMTP_HOST: '', SMTP_PORT: '587', SMTP_SECURE: '0', SMTP_USERNAME: '',
+    SMTP_PASSWORD: '', SMTP_FROM: '', REMINDER_CRON: '0 8 * * 1-5', REMINDER_ENABLED: '0', REMINDER_TIMEZONE: 'Asia/Jakarta', EXPIRED_SECOND_REMINDER_DAYS: '14',
     // Invoice: Important Information bila Company belum mengisi, dan penanda tangan bila Company tidak punya Signed By.
     DEFAULT_ADDITIONAL_INFORMATION: 'Pembayaran harap ditransfer ke rekening di bawah ini.', DISETUJUI_OLEH: '',
   };

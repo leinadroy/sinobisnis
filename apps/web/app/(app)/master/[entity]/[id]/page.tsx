@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: PageProps<"/master/[entity]/[
 function toInitial(entity: MasterEntity, row: Record<string, unknown> | null) {
   return Object.fromEntries(entity.fields.map((f) => {
     const v = row?.[f.name];
-    if (f.type === "checkbox") return [f.name, row ? Boolean(v) : true];
+    if (f.type === "checkbox") return [f.name, row ? Boolean(v) : !f.defaultOff];
     if (v === null || v === undefined) return [f.name, f.type === "select" && !row ? f.options?.[0] ?? "" : ""];
     return [f.name, String(v)];
   }));

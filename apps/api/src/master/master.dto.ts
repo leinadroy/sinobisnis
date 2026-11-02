@@ -1,5 +1,5 @@
-import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
-import { PERIODE_UNITS, SUMBER_DATA, TAX_TYPES } from '@sml/shared';
+import { IsBoolean, IsEmail, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { PERIODE_UNITS, REMINDER_TYPES, SUMBER_DATA, TAX_TYPES } from '@sml/shared';
 
 const req = (label: string) => ({ message: `${label} wajib diisi.` });
 /** Opsional & boleh null (kosongkan field). */
@@ -62,4 +62,19 @@ export class TaxDto {
   @IsString() @IsNotEmpty(req('Name')) @MaxLength(100) name: string;
   @IsNumber({}, { message: 'Percentage harus angka.' }) @Min(0) @Max(100) percentage: number;
   @IsOptional() @IsIn([...TAX_TYPES]) type?: 'ADDITION' | 'REDUCTION';
+}
+
+export class EmailTemplateDto {
+  @IsIn([...REMINDER_TYPES], { message: 'Code harus salah satu kategori reminder.' }) code: string;
+  @IsOptional() @Nullable() @IsString() @MaxLength(200) description?: string | null;
+  @IsOptional() @Nullable() @IsString() @MaxLength(300) subject?: string | null;
+  @IsOptional() @Nullable() @IsString() @MaxLength(50000) @Matches(/\{\{TABLE\}\}/, { message: 'Body wajib memuat {{TABLE}}.' }) body?: string | null;
+}
+
+export class EmailRecipientDto {
+  @IsOptional() @Nullable() @IsString() @MaxLength(200) name?: string | null;
+  @IsEmail({}, { message: 'Format email tidak valid.' }) @MaxLength(200) email: string;
+  @IsOptional() @IsIn(['TO', 'CC', 'BCC']) type?: 'TO' | 'CC' | 'BCC';
+  @IsOptional() @IsBoolean() isAccounting?: boolean;
+  @IsOptional() @IsBoolean() isActive?: boolean;
 }
