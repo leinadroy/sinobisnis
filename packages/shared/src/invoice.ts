@@ -47,8 +47,9 @@ export interface InvoiceItemRow {
   subTotal: number;
 }
 
+/** Baris nama TKA di grup: `id` = id client bila terhubung (null = nama saja, umumnya dari invoice sistem lama). */
 export interface InvoiceGroupClientRow {
-  id: number;
+  id: number | null;
   name: string;
   noPaspor: string | null;
 }
@@ -71,7 +72,8 @@ export interface InvoiceAttachmentRow {
   originalName: string;
   mime: string | null;
   size: number | null;
-  uploadedAt: string;
+  /** Tabel invoiceattachment lama tidak menyimpan waktu unggah. */
+  uploadedAt: string | null;
 }
 
 export interface UpdateRequestRow {
@@ -110,7 +112,11 @@ export interface InvoiceInput {
   status: InvoiceStatus;
   information: string | null;
   bankAccountId: number | null;
-  groups: { clientIds: number[]; items: { description: string; keperluanId: number | null; qty: number; unitPrice: number }[] }[];
+  groups: {
+    /** Urutan = urutan cetak. clientId null = nama tanpa data client (name wajib). */
+    clients: { clientId: number | null; name: string }[];
+    items: { description: string; keperluanId: number | null; qty: number; unitPrice: number }[];
+  }[];
   taxes: { taxId: number | null; description: string; value: number }[];
 }
 
@@ -165,14 +171,14 @@ export interface KontrakRow {
   date: string | null;
   billToId: number;
   billToName: string;
-  alamat: string | null;
-  isi: string | null;
+  nomor: string | null;
   itemCount: number;
 }
 
+/** Satu harga per Keperluan (tabel kontrakdetail); nama layanan = nama Keperluan. */
 export interface KontrakItemRow {
   id?: number;
-  keperluanId: number | null;
+  keperluanId: number;
   description: string;
   duration: string | null;
   price: number;
@@ -185,9 +191,8 @@ export interface KontrakDetail extends KontrakRow {
 export interface KontrakInput {
   date: string | null;
   billToId: number;
-  alamat: string | null;
-  isi: string | null;
-  items: { keperluanId: number | null; description: string; duration: string | null; price: number }[];
+  nomor: string | null;
+  items: { keperluanId: number; duration: string | null; price: number }[];
 }
 
 // ───────────────────────── Perhitungan ─────────────────────────
@@ -195,19 +200,20 @@ export interface KontrakInput {
 const ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
 /**
- * Nomor invoice dari format Company: {NO} nomor urut 4 digit, {ROMAWI} bulan romawi, {MM} bulan, {YYYY}/{YY} tahun.
- * `date` = 'YYYY-MM-DD'.
+ * Nomor invoice dari CompanyInvoiceNoFormat (format GeneXus): @autonumber@ = penghitung company (CompanyInvoiceLastNo + 1),
+ * minimal 3 digit; @ROM@ bulan romawi,
+ * @MM@ bulan, @YYYY@ / @YY@ tahun. `date` = 'YYYY-MM-DD'. Contoh: @YY@@autonumber@/SML/@ROM@/@YYYY@ → 26373/SML/XI/2026.
  */
-export function formatInvoiceNo(format: string | null | undefined, no: number, date: string): string {
+export function formatInvoiceNo(format: string | null | undefined, seq: number, date: string): string {
   const [y, m] = date.slice(0, 10).split('-');
-  const month = Number(m);
-  return (format || '{NO}')
-    .replaceAll('{NO}', String(no).padStart(4, '0'))
-    .replaceAll('{ROMAWI}', ROMAWI[month - 1] ?? '')
-    .replaceAll('{MM}', m)
-    .replaceAll('{YYYY}', y)
-    .replaceAll('{YY}', y.slice(2));
+  return (format?.trim() || '@autonumber@')
+    .replaceAll('@autonumber@', String(seq).padStart(3, '0'))
+    .replaceAll('@ROM@', ROMAWI[Number(m) - 1] ?? '')
+    .replaceAll('@MM@', m)
+    .replaceAll('@YYYY@', y)
+    .replaceAll('@YY@', y.slice(2));
 }
+
 
 /** Pembulatan nominal ke 2 desimal (hindari 0.1 + 0.2 = 0.30000000000000004). */
 export const roundMoney = (n: number) => Math.round((Number(n) || 0) * 100) / 100;

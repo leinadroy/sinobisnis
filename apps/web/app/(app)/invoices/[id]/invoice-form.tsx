@@ -60,7 +60,7 @@ function toInput(s: State): InvoiceInput {
     date: h.date || null, paidDate: h.status === "PAID" ? h.paidDate || null : null, status: h.status, information: h.information || null,
     bankAccountId: id(h.bankAccountId),
     groups: s.groups.map((g) => ({
-      clientIds: g.clients.map((c) => c.id),
+      clients: g.clients.map((c) => ({ clientId: c.id, name: c.name })),
       items: g.items.map((it) => ({ description: it.description, keperluanId: it.keperluanId, qty: num(it.qty), unitPrice: num(it.unitPrice) })),
     })),
     taxes: s.taxes.map((t) => ({ taxId: id(t.taxId), description: t.description, value: num(t.value) })),
@@ -116,7 +116,7 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
     s.taxes.map((t) => ({ taxId: t.taxId ? Number(t.taxId) : null, value: num(t.value) })),
     options.taxes,
   );
-  const inForm = new Set(s.groups.flatMap((g) => g.clients.map((c) => c.id)));
+  const inForm = new Set(s.groups.flatMap((g) => g.clients.map((c) => c.id)).filter((x): x is number => x !== null));
 
   const save = () => start(async () => {
     const res = await saveInvoice(detail.id, toInput(s));
@@ -243,17 +243,19 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
                   {editable && <Button variant="outline" size="sm" onClick={() => setGroup(g.key, (x) => ({ ...x, items: [...x.items, newItem()] }))}><Plus /> Add Item</Button>}
 
                   <div className="mt-2 rounded-md bg-muted/30 p-2">
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">Client ({g.clients.length})</p>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Nama TKA ({g.clients.length})</p>
                     {g.clients.length === 0 && <p className="text-sm text-muted-foreground">Belum ada client di grup ini.</p>}
                     <ol className="space-y-0.5 text-sm">
                       {g.clients.map((c, ci) => (
-                        <li key={c.id} className="flex items-center gap-2">
+                        <li key={`${c.id ?? "n"}-${ci}`} className="flex items-center gap-2">
                           <span className="w-6 text-right tabular-nums text-muted-foreground">{ci + 1}.</span>
-                          <Link href={`/clients/${c.id}`} className="min-w-0 truncate hover:underline">{c.name}</Link>
+                          {c.id !== null
+                            ? <Link href={`/clients/${c.id}`} className="min-w-0 truncate hover:underline">{c.name}</Link>
+                            : <span className="min-w-0 truncate" title="Nama tanpa data client (dari invoice sistem lama)">{c.name} <span className="text-xs text-muted-foreground">(tanpa data client)</span></span>}
                           {c.noPaspor && <span className="text-xs text-muted-foreground">{c.noPaspor}</span>}
                           {editable && (
                             <Button variant="ghost" size="icon-xs" aria-label={`Keluarkan ${c.name}`} className="ml-auto text-destructive"
-                              onClick={() => setGroup(g.key, (x) => ({ ...x, clients: x.clients.filter((y) => y.id !== c.id) }))}><X /></Button>
+                              onClick={() => setGroup(g.key, (x) => ({ ...x, clients: x.clients.filter((_, i) => i !== ci) }))}><X /></Button>
                           )}
                         </li>
                       ))}

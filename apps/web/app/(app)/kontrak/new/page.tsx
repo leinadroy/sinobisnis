@@ -14,7 +14,7 @@ export default async function NewKontrakPage() {
   return (
     <div>
       <PageHeader title="Kontrak — Insert" />
-      <KontrakForm options={options} canEdit initial={{ date: todayStr(), billToId: 0, alamat: null, isi: null, items: [] }} />
+      <KontrakForm options={options} canEdit initial={{ date: todayStr(), billToId: 0, nomor: null, items: [] }} />
     </div>
   );
 }

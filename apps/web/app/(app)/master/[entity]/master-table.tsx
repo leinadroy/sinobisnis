@@ -24,7 +24,7 @@ export function MasterTable({ entity, list, canEdit }: { entity: MasterEntity; l
     const v = r[f.listField ?? f.name];
     if (f.type === "checkbox") return v ? <Badge variant="secondary">Ya</Badge> : <span className="text-muted-foreground">-</span>;
     if (v === null || v === undefined || v === "") return "";
-    if (f.type === "number") return <span className="tabular-nums">{fmtMoney(Number(v))}</span>;
+    if (f.type === "number") return <span className="tabular-nums">{f.readOnly ? String(v) : fmtMoney(Number(v))}</span>;
     return String(v);
   };
 

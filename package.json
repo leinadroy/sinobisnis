@@ -5,8 +5,6 @@
   "scripts": {
     "install:all": "cd packages/shared && npm install && npm run build && cd ../../apps/api && npm install && cd ../web && npm install",
     "build:shared": "npm --prefix packages/shared run build",
-    "db:migrate": "npm --prefix apps/api run db:migrate",
-    "db:seed": "npm --prefix apps/api run db:seed",
     "dev:api": "npm --prefix apps/api run start:dev",
     "dev:web": "npm --prefix apps/web run dev",
     "build": "npm run build:shared && npm --prefix apps/api run build && npm --prefix apps/web run build"

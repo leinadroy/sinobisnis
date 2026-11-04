@@ -108,7 +108,7 @@ export function SystemConfigEditor({ rows, canEdit }: { rows: SystemConfigRow[];
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="size-4" /> Key baru</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              <Input placeholder="NAMA_KEY" value={key} onChange={(e) => setKey(e.target.value.toUpperCase())} aria-label="Key baru" />
+              <Input placeholder="Nama key, mis. Web Folder Name" maxLength={100} value={key} onChange={(e) => setKey(e.target.value)} aria-label="Key baru" />
               <Input placeholder="Nilai" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Nilai key baru" />
               <Button variant="outline" disabled={pending || !key.trim()} onClick={add}>Tambah</Button>
             </CardContent>

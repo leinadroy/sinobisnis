@@ -4,7 +4,7 @@ import { RemindersController, SystemConfigController } from './reminders.control
 import { RemindersService } from './reminders.service.js';
 import { SystemConfigService } from './system-config.service.js';
 
-/** Email Reminder + penjadwal, dan System Configurator (perubahan key REMINDER_* memuat ulang jadwal). */
+/** Email Reminder + penjadwal, dan System Configurator (perubahan key "Reminder …" memuat ulang jadwal). */
 @Module({
   controllers: [RemindersController, SystemConfigController],
   providers: [RemindersService, ReminderScheduler, SystemConfigService],

@@ -1,29 +1,20 @@
-import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   Body, Controller, Delete, ForbiddenException, Get, Header, HttpCode, Param, ParseIntPipe, Post, Put, Query, Res, StreamableFile, UploadedFiles, UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { canView } from '@sml/shared';
 import { CurrentUser, Menu } from '../common/decorators.js';
 import type { AuthUser } from '../auth/auth.types.js';
-import { UPLOAD_DIR } from '../clients/clients.service.js';
 import {
   CreateInvoiceDto, InvoiceableQueryDto, InvoiceListQueryDto, PriceListQueryDto, RequestEditDto, RequestListQueryDto, SaveInvoiceDto,
 } from './invoices.dto.js';
 import { InvoicesService } from './invoices.service.js';
 
-const upload = FilesInterceptor('files', 20, {
-  storage: diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (_req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname).slice(0, 10)}`),
-  }),
-  limits: { fileSize: 20 * 1024 * 1024 },
-});
+// Lampiran disimpan sebagai blob di tabel invoiceattachment (seperti aplikasi lama), jadi file ditahan di memori.
+const upload = FilesInterceptor('files', 20, { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 type ExportRow = Awaited<ReturnType<InvoicesService['exportRows']>>[number];
 const CSV_COLUMNS: [keyof ExportRow, string][] = [
@@ -104,9 +95,9 @@ export class InvoicesController {
   @Get('attachments/:aid/file')
   async download(@Param('aid', ParseIntPipe) aid: number, @Res({ passthrough: true }) res: Response) {
     const a = await this.invoices.attachment(aid);
-    res.setHeader('Content-Type', a.mime || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(a.originalName)}`);
-    return new StreamableFile(fs.createReadStream(a.file));
+    res.setHeader('Content-Type', a.mime);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(a.name)}`);
+    return new StreamableFile(a.data);
   }
 
   @Menu('invoices')

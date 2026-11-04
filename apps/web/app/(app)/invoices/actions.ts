@@ -32,7 +32,6 @@ export async function deleteInvoice(id: number) {
 }
 
 export async function requestEdit(id: number, reason: string) {
-  if (!reason.trim()) return { ok: false as const, error: "Alasan request edit wajib diisi." };
   const res = await runAction(() => apiFetch<InvoiceDetail>(`/invoices/${id}/request-edit`, { method: "POST", json: { reason } }));
   if (res.ok) refresh(id);
   return res;

@@ -11,8 +11,8 @@ Standar teknologi untuk semua aplikasi di project ini.
 | Styling | **Tailwind CSS** | Utility-first, konsisten, cepat |
 | Komponen UI | **shadcn/ui** | Komponen siap pakai (Radix UI + Tailwind), kode ada di repo sendiri |
 | Tabel data | **shadcn/ui Data Table** (TanStack Table) | Sorting, filter, pagination, column visibility, row selection |
-| ORM | **Prisma** | Schema type-safe, migrasi, query client otomatis |
-| Database | **PostgreSQL** | Database utama untuk aplikasi baru |
+| ORM | **Prisma** (adapter MariaDB) | Schema type-safe, query client otomatis |
+| Database | **MariaDB** dengan struktur production `sinobisnis` | Aplikasi baru menggantikan aplikasi GeneXus di atas tabel yang sama |
 | Bahasa | **TypeScript** di frontend dan backend | Satu bahasa, type bisa dibagi antar app |
 
 ## Arsitektur
@@ -27,7 +27,7 @@ Next.js (apps/web)          ← halaman, SEO, UI (Tailwind + shadcn/ui + Data Ta
 NestJS (apps/api)           ← business logic, auth, validasi, REST API
   │  Prisma Client
   ▼
-PostgreSQL                  ← data aplikasi
+MariaDB (struktur sinobisnis) ← data aplikasi
 ```
 
 - Next.js **tidak** mengakses database langsung; semua data lewat API NestJS.
@@ -77,29 +77,16 @@ Smlgroupid/
 - Response list memakai format: `{ data: [...], total, page, pageSize }`.
 - Dokumentasi API dengan Swagger (`@nestjs/swagger`).
 
-### Database (Prisma + PostgreSQL)
-- Schema di `apps/api/prisma/schema.prisma`; perubahan schema selalu lewat `prisma migrate`.
-- Nama model PascalCase, nama kolom camelCase, tabel di-map ke snake_case (`@@map`).
-- Koneksi lewat `DATABASE_URL` di `.env` (tidak di-commit).
+### Database (Prisma + MariaDB)
+- Schema di `apps/api/prisma/schema.prisma` memetakan tabel production GeneXus apa adanya. **Struktur tidak boleh
+  diubah** (tidak ada `prisma migrate`; `prisma migrate diff` terhadap database harus kosong).
+- Nama model PascalCase dan field camelCase, di-map ke nama tabel/kolom lama dengan `@@map`/`@map`.
+- Koneksi lewat `DATABASE_URL` di `.env` (tidak di-commit). Konvensi data GeneXus (tanggal kosong `1000-01-01`,
+  DATETIME jam lokal, dll.) dijelaskan di `apps/api/README.md`.
 
-## Catatan: database lama (sinobisnis)
+## Catatan: database production (sinobisnis)
 
-- Data invoice yang sudah ada tersimpan di **MariaDB** `sinobisnis` (10.10.3.23), bukan PostgreSQL.
-- Akses ke database itu **read-only** (lihat `CLAUDE.md` dan `tools/db.py`).
+- Production ada di **MariaDB** `sinobisnis` (10.10.3.23, butuh VPN). Dari project ini aksesnya **read-only**
+  (lihat `CLAUDE.md` dan `tools/db.py`).
+- Development memakai salinan lokal: `python tools/migrate/clone_production.py all --replace` (struktur + data, tanpa blob).
 - Pemetaan tabel invoice ada di [`docs/invoice-mapping.md`](invoice-mapping.md).
-- Jika aplikasi baru perlu membaca data lama, pilihannya: migrasi data ke PostgreSQL, atau koneksi Prisma kedua (provider `mysql`) khusus baca.
-
-## Perintah awal (setup)
-
-```bash
-# Frontend
-npx create-next-app@latest apps/web --typescript --tailwind --eslint --app
-cd apps/web && npx shadcn@latest init
-npx shadcn@latest add button input table dropdown-menu form
-npm install @tanstack/react-table
-
-# Backend
-npx @nestjs/cli new apps/api
-cd apps/api && npm install prisma @prisma/client class-validator class-transformer @nestjs/swagger
-npx prisma init --datasource-provider postgresql
-```

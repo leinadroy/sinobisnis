@@ -1,6 +1,9 @@
-// Skema aplikasi Sinobisnis (pengganti sistem GeneXus lama).
-// Konvensi (docs/tech-stack.md): model PascalCase, field camelCase, tabel & kolom snake_case via @@map/@map.
-// Perubahan skema selalu lewat `npx prisma migrate dev`.
+// Skema aplikasi Sinobisnis = struktur database production `sinobisnis` (GeneXus) apa adanya.
+// Database lokal: MariaDB `sinobisnis` (salinan production lewat tools/migrate/clone_production.py).
+// Nama model/field dirapikan dengan @@map/@map; JANGAN ubah kolom, tipe, atau index di sini — strukturnya harus tetap
+// identik dengan production. Cek dengan: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma
+//
+// Konvensi data GeneXus: tanggal kosong = 1000-01-01, teks kosong = '' (banyak kolom NOT NULL), ID 0 = tidak dipilih.
 
 generator client {
   provider            = "prisma-client"
@@ -10,443 +13,485 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
 }
 
 // ───────────────────────── Security ─────────────────────────
 
-model Role {
-  id    Int        @id @default(autoincrement())
-  name  String     @unique
-  users User[]
-  menus RoleMenu[]
-
-  @@map("roles")
-}
-
-/// Matriks hak akses per role & menu (setara Role Pgmname di production).
-model RoleMenu {
-  roleId    Int     @map("role_id")
-  menuKey   String  @map("menu_key")
-  isActive  Boolean @default(true) @map("is_active")
-  allowEdit Boolean @default(false) @map("allow_edit")
-  role      Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, menuKey])
-  @@map("role_menus")
-}
-
 model User {
-  id           Int       @id @default(autoincrement())
-  fullname     String
-  username     String    @unique
-  email        String?
-  passwordHash String    @map("password_hash")
-  roleId       Int?      @map("role_id")
-  isActive     Boolean   @default(true) @map("is_active")
-  lastLogin    DateTime? @map("last_login")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  role         Role?     @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  id             Int            @id @default(autoincrement()) @map("UsersId") @db.SmallInt
+  username       String         @map("UsersUsername") @db.VarChar(40)
+  fullname       String         @map("UsersFullname") @db.VarChar(100)
+  /// Salt GeneXus; "bcrypt" bila password sudah diganti lewat aplikasi baru.
+  salt           String         @map("UsersSalt") @db.VarChar(100)
+  hashedPassword String         @map("UsersHashedPassword") @db.VarChar(200)
+  isActive       Boolean        @map("UsersIsActive")
+  email          String         @map("UsersEmail") @db.VarChar(100)
+  lastLogin      DateTime       @map("UsersLastLogin") @db.DateTime(0)
+  roleId         Int            @map("RoleId") @db.SmallInt
+  isApprover     Boolean        @default(true) @map("UsersIsApprover")
+  role           Role           @relation(fields: [roleId], references: [id], onUpdate: Restrict, map: "IUSERS1")
+  conversations  Conversation[]
+  notifications  Notification[]
+  printQueues    PrintQueue[]
+  cookies        UserCookie[]
 
+  @@index([roleId], map: "IUSERS1")
   @@map("users")
+}
+
+model Role {
+  id       Int          @id @default(autoincrement()) @map("RoleId") @db.SmallInt
+  name     String       @map("RoleName") @db.VarChar(40)
+  programs RolePgmname[]
+  users    User[]
+
+  @@map("role")
+}
+
+/// Hak akses role per menu (MenuItemId) — Role Pgmname di aplikasi lama.
+model RolePgmname {
+  id          Int      @id @default(autoincrement()) @map("RolePgmnameId") @db.SmallInt
+  roleId      Int      @map("RoleId") @db.SmallInt
+  pgmName     String   @map("PgmName") @db.VarChar(100)
+  isActive    Boolean  @map("RolePgmnameIsActive")
+  menuItemId  Int      @map("MenuItemId") @db.SmallInt
+  isAllowEdit Boolean  @map("RolePgmnameIsAllowEdit")
+  role        Role     @relation(fields: [roleId], references: [id], onUpdate: Restrict, map: "IROLEPGMNAME1")
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onUpdate: Restrict, map: "IROLEPGMNAME2")
+
+  @@index([roleId], map: "IROLEPGMNAME1")
+  @@index([menuItemId], map: "IROLEPGMNAME2")
+  @@map("rolepgmname")
+}
+
+model MenuItem {
+  id                    Int           @id @default(autoincrement()) @map("MenuItemId") @db.SmallInt
+  caption               String        @map("MenuItemCaption") @db.VarChar(40)
+  order                 Int           @map("MenuItemOrder") @db.SmallInt
+  fatherId              Int?          @map("MenuItemFatherId") @db.SmallInt
+  type                  Int           @map("MenuItemType") @db.SmallInt
+  link                  String        @map("MenuItemLink") @db.VarChar(40)
+  linkParameters        String        @map("MenuItemLinkParameters") @db.VarChar(100)
+  linkTarget            String        @map("MenuItemLinkTarget") @db.VarChar(10)
+  iconClass             String        @map("MenuItemIconClass") @db.VarChar(40)
+  showDeveloperOptions  Boolean       @map("MenuItemShowDeveloperMenuOptio")
+  showEditOptions       Boolean       @map("MenuItemShowEditMenuOptions")
+  father                MenuItem?     @relation("MenuItemTree", fields: [fatherId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "IMENUITEM1")
+  children              MenuItem[]    @relation("MenuItemTree")
+  programs              RolePgmname[]
+
+  @@index([fatherId], map: "IMENUITEM1")
+  @@index([caption], map: "MENUITEMCAPTION")
+  @@map("menuitem")
+}
+
+/// Sesi login aplikasi lama (tidak dipakai aplikasi baru yang memakai JWT).
+model UserCookie {
+  id              BigInt   @id @default(autoincrement()) @map("UserCookiesId")
+  value           String   @map("UserCookiesValue") @db.VarChar(100)
+  createdDatetime DateTime @map("UserCookiesCreatedDatetime") @db.DateTime(0)
+  isActive        Boolean  @map("UserCookiesIsActive")
+  userId          Int      @map("UsersId") @db.SmallInt
+  description     String   @map("UserCookiesDescription") @db.VarChar(40)
+  remoteAddress   String   @map("UserCookiesRemoteAddress") @db.VarChar(40)
+  user            User     @relation(fields: [userId], references: [id], onUpdate: Restrict, map: "IUSERCOOKIES1")
+
+  @@index([userId], map: "IUSERCOOKIES1")
+  @@map("usercookies")
 }
 
 // ───────────────────────── Master data ─────────────────────────
 
 model Sponsor {
-  id       Int              @id @default(autoincrement())
-  name     String
+  id       Int              @id @default(autoincrement()) @map("SponsorId") @db.SmallInt
+  name     String           @map("SponsorName") @db.VarChar(100)
+  isActive Boolean          @map("SponsorIsActive")
   projects SponsorProject[]
-  clients  Client[]
-  invoices Invoice[]
 
-  @@map("sponsors")
+  @@map("sponsor")
+}
+
+/// Project sponsor menyimpan data perusahaan penagihan sendiri (bukan relasi ke Bill To).
+model SponsorProject {
+  id             Int     @id @default(autoincrement()) @map("ProjectId") @db.SmallInt
+  name           String  @map("ProjectName") @db.VarChar(100)
+  kodePerusahaan String  @map("ProjectKodePerusahaan") @db.VarChar(100)
+  companyName    String  @map("ProjectCompanyName") @db.VarChar(100)
+  npwp           String  @map("ProjectNPWP") @db.VarChar(100)
+  alamat1        String  @map("ProjectAlamatBaris1") @db.VarChar(100)
+  alamat2        String  @map("ProjectAlamatBaris2") @db.VarChar(100)
+  alamat3        String  @map("ProjectAlamatBaris3") @db.VarChar(100)
+  alamat4        String  @map("ProjectAlamatBaris4") @db.VarChar(100)
+  sponsorId      Int     @map("SponsorId") @db.SmallInt
+  sponsor        Sponsor @relation(fields: [sponsorId], references: [id], onUpdate: Restrict, map: "ISPONSORPROJECT1")
+
+  @@index([sponsorId], map: "ISPONSORPROJECT1")
+  @@map("sponsorproject")
 }
 
 model BillTo {
-  id             Int              @id @default(autoincrement())
-  kodePerusahaan String?          @map("kode_perusahaan")
-  companyName    String           @map("company_name")
-  npwp           String?
-  alamat1        String?          @map("alamat_1")
-  alamat2        String?          @map("alamat_2")
-  alamat3        String?          @map("alamat_3")
-  alamat4        String?          @map("alamat_4")
-  projects       SponsorProject[]
+  id             Int       @id @default(autoincrement()) @map("BillToId") @db.SmallInt
+  kodePerusahaan String    @map("BillToKodePerusahaan") @db.VarChar(40)
+  companyName    String    @map("BillToCompanyName") @db.VarChar(200)
+  npwp           String    @map("BillToNPWP") @db.VarChar(100)
+  alamat1        String    @map("BillToAlamatBaris1") @db.VarChar(100)
+  alamat2        String    @map("BillToAlamatBaris2") @db.VarChar(100)
+  alamat3        String    @map("BillToAlamatBaris3") @db.VarChar(100)
+  alamat4        String    @map("BillToAlamatBaris4") @db.VarChar(100)
   invoices       Invoice[]
   kontrak        Kontrak[]
 
-  @@map("bill_to")
-}
-
-model SponsorProject {
-  id        Int      @id @default(autoincrement())
-  sponsorId Int      @map("sponsor_id")
-  name      String
-  billToId  Int?     @map("bill_to_id")
-  sponsor   Sponsor  @relation(fields: [sponsorId], references: [id])
-  billTo    BillTo?  @relation(fields: [billToId], references: [id], onDelete: SetNull)
-  clients   Client[]
-
-  @@map("sponsor_projects")
-}
-
-enum PeriodeUnit {
-  MONTHS
-  DAYS
+  @@map("billto")
 }
 
 model Keperluan {
-  id                        Int           @id @default(autoincrement())
-  name                      String
-  periode                   Int           @default(0)
-  periodeIn                 PeriodeUnit   @default(MONTHS) @map("periode_in")
-  sumberData                String        @default("TANGGAL TERBIT DOKUMEN") @map("sumber_data")
-  isActive                  Boolean       @default(true) @map("is_active")
-  harga                     Decimal       @default(0) @db.Decimal(18, 2)
-  reminderPembuatanInvoice  Int?          @default(14) @map("reminder_pembuatan_invoice")
-  reminderPembayaranInvoice Int?          @default(30) @map("reminder_pembayaran_invoice")
-  reminderExpiredDokumen    Int?          @default(60) @map("reminder_expired_dokumen")
-  reminderExpired2nd        Int?          @default(14) @map("reminder_expired_2nd")
-  clients                   Client[]
-  invoiceItems              InvoiceItem[]
-  kontrakItems              KontrakItem[]
+  id                        Int             @id @default(autoincrement()) @map("KeperluanId") @db.SmallInt
+  name                      String          @map("KeperluanName") @db.VarChar(40)
+  periode                   Int?            @map("KeperluanPeriode") @db.SmallInt
+  /// 'TANGGAL TERBIT DOKUMEN' | 'TANGGAL MASUK INDO / EXP. DOKUMEN SEBELUMNYA' | 'TANGGAL PROSES SELESAI'
+  sumberData                String?         @map("KeperluanSumberData") @db.VarChar(100)
+  /// 'MONTHS' | 'DAYS' (data lama kadang berakhiran tab)
+  periodeIn                 String?         @map("KeperluanPeriodeIn") @db.VarChar(40)
+  isActive                  Boolean         @map("KeperluanIsActive")
+  reminderPembuatanInvoice  Int             @default(0) @map("ReminderPembuatanInvoice") @db.SmallInt
+  reminderPembayaranInvoice Int             @default(0) @map("ReminderPembayaranInvoice") @db.SmallInt
+  reminderExpiredDokumen    Int             @default(0) @map("ReminderExpiredDokumen") @db.SmallInt
+  reminderExpired2nd        Int             @map("ReminderExpired2nd") @db.SmallInt
+  reminderEpo               Int             @map("ReminderEPO") @db.SmallInt
+  actions                   Action[]
+  kontrakDetails            KontrakDetail[]
 
   @@map("keperluan")
 }
 
 model BankAccount {
-  id         Int       @id @default(autoincrement())
-  bankName   String    @map("bank_name")
-  branch     String?
-  address    String?   @db.Text
-  swiftcode  String?
-  accountFor String?   @map("account_for")
-  accountNo  String?   @map("account_no")
-  companies  Company[]
+  id         Int       @id @default(autoincrement()) @map("BankAccountId") @db.SmallInt
+  bankName   String    @map("BankAccountBankName") @db.VarChar(400)
+  branch     String?   @map("BankAccountBranch") @db.VarChar(400)
+  address1   String?   @map("BankAccountAddress1") @db.VarChar(100)
+  address2   String?   @map("BankAccountAddress2") @db.VarChar(100)
+  address3   String?   @map("BankAccountAddress3") @db.VarChar(100)
+  address4   String?   @map("BankAccountAddress4") @db.VarChar(100)
+  swiftcode  String?   @map("BankAccountSwiftcode") @db.VarChar(100)
+  accountFor String    @map("BankAccountAccountFor") @db.VarChar(100)
+  accountNo  String    @map("BankAccountNo") @db.VarChar(40)
   invoices   Invoice[]
 
-  @@map("bank_accounts")
+  @@map("bankaccount")
 }
 
+/// Company penerbit invoice. Id 0 = baris placeholder "== Please Select ==".
 model Company {
-  id                 Int          @id @default(autoincrement())
-  name               String
-  address            String?      @db.Text
-  lastNo             Int          @default(0) @map("last_no")
-  noFormat           String       @default("{NO}/SML/{ROMAWI}/{YYYY}") @map("no_format")
-  bankAccountId      Int?         @map("bank_account_id")
-  invoiceInformation String?      @map("invoice_information") @db.Text
-  signedBy           String?      @map("signed_by")
-  signedTitle        String?      @default("Finance") @map("signed_title")
-  bankAccount        BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
-  invoices           Invoice[]
+  /// Tidak auto increment di production.
+  id                 Int      @id @map("CompanyId") @db.SmallInt
+  name               String   @map("CompanyName") @db.VarChar(40)
+  bankAccountId      Int      @map("CompanyBankAccountId") @db.SmallInt
+  printFormat        String   @map("CompanyPrintFormat") @db.VarChar(40)
+  /// Format GeneXus, mis. @YY@@autonumber@/SML/@ROM@/@YYYY@
+  invoiceNoFormat    String   @map("CompanyInvoiceNoFormat") @db.VarChar(40)
+  invoiceLastNo      Int      @map("CompanyInvoiceLastNo") @db.MediumInt
+  address            String   @map("CompanyAddress") @db.VarChar(4000)
+  invoiceInformation String   @map("CompanyInvoiceInformation") @db.VarChar(4000)
+  invoiceSignedBy    String   @map("CompanyInvoiceSignedBy") @db.VarChar(40)
+  clients            Client[]
 
-  @@map("companies")
-}
-
-enum TaxType {
-  ADDITION
-  REDUCTION
+  @@map("company")
 }
 
 model Tax {
-  id           Int          @id @default(autoincrement())
-  name         String
-  percentage   Decimal      @db.Decimal(6, 3)
-  type         TaxType      @default(ADDITION) @map("addition_reduction")
-  invoiceTaxes InvoiceTax[]
+  id                Int    @id @default(autoincrement()) @map("TaxId") @db.SmallInt
+  name              String @map("TaxName") @db.VarChar(40)
+  percentage        Int    @map("TaxPercentage") @db.SmallInt
+  /// 'ADDITION' | 'REDUCTION'
+  additionReduction String @map("TaxAdditionReduction") @db.VarChar(40)
 
-  @@map("taxes")
+  @@map("tax")
 }
 
 // ───────────────────────── Client ─────────────────────────
 
 model Client {
-  id                       Int                  @id @default(autoincrement())
-  tanggalPermohonan        DateTime?            @map("tanggal_permohonan") @db.Date
-  sponsorId                Int?                 @map("sponsor_id")
-  projectId                Int?                 @map("project_id")
-  name                     String
-  noPaspor                 String?              @map("no_paspor")
-  tanggalLahir             DateTime?            @map("tanggal_lahir") @db.Date
-  keperluanId              Int?                 @map("keperluan_id")
-  noRptka                  String?              @map("no_rptka")
-  pembayaranPnbp           DateTime?            @map("pembayaran_pnbp") @db.Date
-  permohonanHariKe3        String?              @map("permohonan_hari_ke3")
-  tanggalProsesSelesai     DateTime?            @map("tanggal_proses_selesai") @db.Date
-  tanggalTerbitDokumen     DateTime?            @map("tanggal_terbit_dokumen") @db.Date
-  tanggalMasukLastExp      DateTime?            @map("tanggal_masuk_last_exp") @db.Date
-  expiredDokumen           DateTime?            @map("expired_dokumen") @db.Date
-  epo                      String?
-  noInvoice                String?              @map("no_invoice")
-  tanggalInvoice           DateTime?            @map("tanggal_invoice") @db.Date
-  tanggalPembayaranInvoice DateTime?            @map("tanggal_pembayaran_invoice") @db.Date
-  prosesPerpanjangan       String?              @map("proses_perpanjangan")
-  sktt                     String?
-  stm                      String?
-  status                   String?
-  keteranganTka            String?              @map("keterangan_tka") @db.Text
-  isArchived               Boolean              @default(false) @map("is_archived")
-  archivedReason           String?              @map("archived_reason")
-  invoiceId                Int?                 @map("invoice_id")
-  createdAt                DateTime             @default(now()) @map("created_at")
-  updatedAt                DateTime             @updatedAt @map("updated_at")
-  sponsor                  Sponsor?             @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
-  project                  SponsorProject?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  keperluan                Keperluan?           @relation(fields: [keperluanId], references: [id], onDelete: SetNull)
-  invoice                  Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
-  attachments              ClientAttachment[]
-  conversations            Conversation[]
-  invoiceGroups            InvoiceGroupClient[]
+  no                       BigInt         @id @default(autoincrement()) @map("ClientNo")
+  /// Nama sponsor (salinan teks dari tabel sponsor).
+  sponsor                  String         @map("ClientSponsor") @db.VarChar(100)
+  tanggalPermohonan        DateTime       @map("ClientTanggalPermohonan") @db.Date
+  permohonanHariKe3        String?        @map("ClientPermohonanHariKe3") @db.VarChar(40)
+  name                     String         @map("ClientName") @db.VarChar(40)
+  noPaspor                 String?        @map("ClientNoPaspor") @db.VarChar(40)
+  noRptka                  String?        @map("ClientNoRPTKA") @db.VarChar(40)
+  /// Nama keperluan (salinan teks dari tabel keperluan).
+  keperluan                String?        @map("ClientKeperluan") @db.VarChar(100)
+  tanggalProsesSelesai     DateTime?      @map("ClientTanggalProsesSelesai") @db.Date
+  expiredDokumen           DateTime?      @map("ClientExpiredDokumen") @db.Date
+  epo                      String?        @map("ClientEPO") @db.VarChar(40)
+  /// Teks nomor invoice — satu-satunya hubungan client ke invoice.
+  noInvoice                String?        @map("ClientNoInvoice") @db.VarChar(40)
+  tanggalInvoice           DateTime?      @map("ClientTanggalInvoice") @db.Date
+  tanggalPembayaranInvoice DateTime?      @map("ClientTanggalPembayaranInvoice") @db.Date
+  prosesPerpanjangan       String?        @map("ClientProsesPerpanjangan") @db.VarChar(40)
+  keteranganTka            String?        @map("ClientKeteranganTKA") @db.VarChar(4000)
+  keperluanId              Int            @map("ClientKeperluanId") @db.SmallInt
+  sponsorId                Int            @map("ClientSponsorId") @db.SmallInt
+  tanggalTerbitDokumen     DateTime?      @map("ClientTanggalTerbitDokumen") @db.Date
+  tanggalMasukLastExp      DateTime?      @map("ClientTanggalMasukLastExp") @db.Date
+  pembayaranPnbp           DateTime?      @map("ClientPembayaranPNBP") @db.Date
+  status                   String?        @map("ClientStatus") @db.VarChar(40)
+  sktt                     String         @default("") @map("ClientSKTT") @db.VarChar(40)
+  stm                      String         @default("") @map("ClientSTM") @db.VarChar(40)
+  companyId                Int            @default(0) @map("CompanyId") @db.SmallInt
+  countAttachment          Int            @default(0) @map("CountAttachment") @db.SmallInt
+  isArchived               Boolean        @default(false) @map("ClientIsArchived")
+  archivedReason           String         @default("") @map("ClientArchivedReason") @db.VarChar(100)
+  projectId                Int?           @map("ClientProjectId") @db.SmallInt
+  tanggalLahir             DateTime?      @map("ClientTanggalLahir") @db.Date
+  /// Hapus lunak: baris tetap ada, disembunyikan dari aplikasi.
+  isDelete                 Boolean        @default(false) @map("ClientIsDelete")
+  company                  Company        @relation(fields: [companyId], references: [id], onUpdate: Restrict, map: "ICLIENT1")
+  notifications            Notification[]
 
-  @@index([name])
-  @@index([noPaspor])
-  @@index([expiredDokumen])
-  @@index([isArchived])
-  @@map("clients")
+  @@index([companyId], map: "ICLIENT1")
+  @@map("client")
 }
 
-model ClientAttachment {
-  id           Int      @id @default(autoincrement())
-  clientId     Int      @map("client_id")
-  originalName String   @map("original_name")
-  storedName   String   @map("stored_name")
-  mime         String?
-  size         Int?
-  uploadedAt   DateTime @default(now()) @map("uploaded_at")
-  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+/// Lampiran client; file disimpan sebagai blob di database.
+model Attachment {
+  id       BigInt   @id @default(autoincrement()) @map("AttachmentId")
+  blob     Bytes    @map("AttachmentBlob")
+  clientNo BigInt   @map("AttachmentClientNo")
+  name     String?  @map("AttachmentName") @db.VarChar(255)
+  url      String?  @map("AttachmentURL") @db.VarChar(1000)
+  status   Boolean? @map("AttachmentStatus")
 
-  @@map("client_attachments")
+  @@map("attachment")
 }
 
-/// Audit perubahan data client (snapshot JSON per aksi).
-model ClientLog {
-  id          Int      @id @default(autoincrement())
-  historyDate DateTime @default(now()) @map("history_date")
-  userName    String?  @map("user_name")
-  clientId    Int?     @map("client_id")
-  action      String
-  snapshot    Json?
-
-  @@index([clientId])
-  @@map("client_logs")
-}
-
+/// Catatan per data (TableName + TableId), mis. conversation client.
 model Conversation {
-  id        Int      @id @default(autoincrement())
-  clientId  Int      @map("client_id")
-  userName  String?  @map("user_name")
-  message   String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  id            BigInt   @id @default(autoincrement()) @map("ConversationId")
+  tableName     String   @map("ConversationTableName") @db.VarChar(40)
+  tableId       BigInt   @map("ConversationTableId")
+  createdAt     DateTime @map("ConversationCreatedAt") @db.DateTime(0)
+  text          String   @map("ConversationText") @db.VarChar(1000)
+  userId        Int      @map("UsersId") @db.SmallInt
+  mentionIdJson Int      @map("ConversationMentionIdJson") @db.SmallInt
+  isDeleted     Boolean  @map("ConversationIsDeleted")
+  user          User     @relation(fields: [userId], references: [id], onUpdate: Restrict, map: "ICONVERSATION1")
 
-  @@map("conversations")
+  @@index([userId], map: "ICONVERSATION1")
+  @@map("conversation")
+}
+
+/// Log perubahan data (Client, Company, Keperluan, Sponsor, Users) dan log pengiriman Reminder.
+model DataLog {
+  id          BigInt   @id @default(autoincrement()) @map("DataLogId")
+  tableName   String   @map("DataLogTableName") @db.VarChar(60)
+  tableId     Int      @map("DataLogTableId") @db.MediumInt
+  /// JSON snapshot (Client) atau teks bebas.
+  description String   @map("DataLogDescription") @db.VarChar(5000)
+  userId      Int      @map("DataLogUsersId") @db.SmallInt
+  created     DateTime @map("DataLogCreated") @db.DateTime(0)
+  /// 'Insert' | 'Update' | 'Delete' | ''
+  tableAction String   @map("DataLogTableAction") @db.VarChar(40)
+
+  @@map("datalog")
+}
+
+model Notification {
+  id        BigInt   @id @default(autoincrement()) @map("NotificationId")
+  createdAt DateTime @map("NotificationCreatedAt") @db.DateTime(0)
+  text      String   @map("NotificationText") @db.VarChar(1000)
+  isRead    Boolean  @map("NotificationIsRead")
+  clientNo  BigInt?  @map("ClientNo")
+  userId    Int      @map("UsersId") @db.SmallInt
+  client    Client?  @relation(fields: [clientNo], references: [no], onDelete: Restrict, onUpdate: Restrict, map: "INOTIFICATION1")
+  user      User     @relation(fields: [userId], references: [id], onUpdate: Restrict, map: "INOTIFICATION2")
+
+  @@index([clientNo], map: "INOTIFICATION1")
+  @@index([userId], map: "INOTIFICATION2")
+  @@map("notification")
 }
 
 // ───────────────────────── Invoice ─────────────────────────
 
-enum InvoiceStatus {
-  DRAFT
-  FINAL
-  PAID
-}
-
 model Invoice {
-  id             Int                 @id @default(autoincrement())
-  no             String?             @unique
-  companyId      Int?                @map("company_id")
-  sponsorId      Int?                @map("sponsor_id")
-  billToId       Int?                @map("bill_to_id")
-  npwp           String?
-  date           DateTime?           @db.Date
-  paidDate       DateTime?           @map("paid_date") @db.Date
-  status         InvoiceStatus       @default(DRAFT)
-  subTotal       Decimal             @default(0) @map("sub_total") @db.Decimal(18, 2)
-  total          Decimal             @default(0) @db.Decimal(18, 2)
-  totalTerbilang String?             @map("total_terbilang") @db.Text
-  information    String?             @db.Text
-  bankAccountId  Int?                @map("bank_account_id")
-  createdBy      String?             @map("created_by")
-  createdAt      DateTime            @default(now()) @map("created_at")
-  company        Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  sponsor        Sponsor?            @relation(fields: [sponsorId], references: [id], onDelete: SetNull)
-  billTo         BillTo?             @relation(fields: [billToId], references: [id], onDelete: SetNull)
-  bankAccount    BankAccount?        @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
-  groups         InvoiceGroup[]
-  items          InvoiceItem[]
-  taxes          InvoiceTax[]
-  attachments    InvoiceAttachment[]
-  updateRequests UpdateRequest[]
-  clients        Client[]
+  id                    BigInt       @id @default(autoincrement()) @map("InvoiceId")
+  no                    String?      @map("InvoiceNo") @db.VarChar(40)
+  sponsorId             Int?         @map("InvoiceSponsorId") @db.SmallInt
+  date                  DateTime?    @map("InvoiceDate") @db.Date
+  /// 1000-01-01 = belum dibayar
+  paidDate              DateTime?    @map("InvoicePaidDate") @db.Date
+  /// 'DRAFT' | 'FINAL' | 'PAID'
+  status                String?      @map("InvoiceStatus") @db.VarChar(40)
+  total                 BigInt?      @map("InvoiceTotal")
+  subTotal              BigInt?      @map("InvoiceSubTotal")
+  additionalInformation String?      @map("AdditionalInformation") @db.VarChar(4000)
+  bankAccountId         Int?         @map("BankAccountId") @db.SmallInt
+  billedTo              String?      @map("InvoiceBilledTo") @db.VarChar(100)
+  totalTerbilang        String?      @map("InvoiceTotalTerbilang") @db.VarChar(200)
+  npwp                  String?      @map("InvoiceNPWP") @db.VarChar(40)
+  companyId             Int?         @map("InvoiceCompanyId") @db.SmallInt
+  billToId              Int?         @map("BillToId") @db.SmallInt
+  /// Status izin edit: '' | 'APPROVED' | 'REJECTED' | 'CANCELED'
+  editStatus            String?      @map("InvoiceEditStatus") @db.VarChar(40)
+  bankAccount           BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "IINVOICE1")
+  billTo                BillTo?      @relation(fields: [billToId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "IINVOICE5")
+  printQueues           PrintQueue[]
 
-  @@map("invoices")
+  @@index([bankAccountId], map: "IINVOICE1")
+  @@index([billToId], map: "IINVOICE2")
+  @@index([billToId], map: "IINVOICE3")
+  @@index([billToId], map: "IINVOICE5")
+  @@map("invoice")
 }
 
-/// Satu grup = sekelompok client yang ditagih dengan item layanan yang sama (nomor baris di cetakan).
-model InvoiceGroup {
-  id        Int                  @id @default(autoincrement())
-  invoiceId Int                  @map("invoice_id")
-  seq       Int                  @default(0)
-  invoice   Invoice              @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  items     InvoiceItem[]
-  clients   InvoiceGroupClient[]
+/// Baris invoice urut id: Qty > 0 = layanan; Qty 0 = nama TKA milik layanan di atasnya (lihat docs/invoice-mapping.md).
+model InvoiceDetail {
+  id          BigInt  @id @default(autoincrement()) @map("InvoiceDetailId")
+  description String  @map("InvoiceDetailDescription") @db.VarChar(100)
+  qty         Int?    @map("InvoiceDetailQty") @db.SmallInt
+  subTotal    BigInt? @map("InvoiceDetailSubTotal")
+  invoiceId   Int?    @map("InvoiceDetailInvoiceId") @db.SmallInt
+  clientNo    BigInt? @map("InvoiceDetailClientNo")
+  keperluanId Int?    @default(0) @map("InvoiceDetailKeperluanId") @db.SmallInt
+  unitPrice   BigInt  @map("InvoiceDetailUnitPrice")
 
-  @@map("invoice_groups")
-}
-
-model InvoiceGroupClient {
-  groupId  Int          @map("group_id")
-  clientId Int          @map("client_id")
-  seq      Int          @default(0)
-  group    InvoiceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  client   Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@id([groupId, clientId])
-  @@map("invoice_group_clients")
-}
-
-model InvoiceItem {
-  id          Int          @id @default(autoincrement())
-  groupId     Int          @map("group_id")
-  invoiceId   Int          @map("invoice_id")
-  seq         Int          @default(0)
-  description String
-  keperluanId Int?         @map("keperluan_id")
-  qty         Decimal      @default(1) @db.Decimal(12, 2)
-  unitPrice   Decimal      @default(0) @map("unit_price") @db.Decimal(18, 2)
-  subTotal    Decimal      @default(0) @map("sub_total") @db.Decimal(18, 2)
-  group       InvoiceGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  keperluan   Keperluan?   @relation(fields: [keperluanId], references: [id], onDelete: SetNull)
-
-  @@map("invoice_items")
+  @@map("invoicedetail")
 }
 
 model InvoiceTax {
-  id          Int     @id @default(autoincrement())
-  invoiceId   Int     @map("invoice_id")
-  taxId       Int?    @map("tax_id")
-  description String
-  value       Decimal @default(0) @db.Decimal(18, 2)
-  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  tax         Tax?    @relation(fields: [taxId], references: [id], onDelete: SetNull)
+  id          BigInt @id @default(autoincrement()) @map("InvoiceTaxId")
+  description String @map("InvoiceTaxDescription") @db.VarChar(100)
+  value       BigInt @map("InvoiceTaxValue")
+  invoiceId   Int    @map("InvoiceTaxInvoiceId") @db.SmallInt
 
-  @@map("invoice_taxes")
+  @@map("invoicetax")
 }
 
+/// Lampiran invoice: blob sendiri, atau rujukan ke lampiran client (attachmentRefId → attachment.AttachmentId).
 model InvoiceAttachment {
-  id           Int      @id @default(autoincrement())
-  invoiceId    Int      @map("invoice_id")
-  originalName String   @map("original_name")
-  storedName   String   @map("stored_name")
-  mime         String?
-  size         Int?
-  uploadedAt   DateTime @default(now()) @map("uploaded_at")
-  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id              BigInt  @id @default(autoincrement()) @map("InvoiceAttachmentId")
+  invoiceId       Int     @map("InvoiceAttachmentInvoiceId") @db.SmallInt
+  blob            Bytes?  @map("InvoiceAttachmentBlob")
+  attId           BigInt? @map("InvoiceAttachmentAttId")
+  attachmentRefId BigInt? @map("InvoiceAttachmentIdInvoice")
+  name            String? @map("InvoiceAttachmentName") @db.VarChar(255)
+  url             String? @map("InvoiceAttachmentURL") @db.VarChar(1000)
 
-  @@map("invoice_attachments")
+  @@map("invoiceattachment")
 }
 
-enum RequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
-  DONE
-}
-
-/// Izin edit invoice yang sudah FINAL/PAID.
+/// Izin edit invoice FINAL/PAID.
 model UpdateRequest {
-  id          Int           @id @default(autoincrement())
-  invoiceId   Int           @map("invoice_id")
-  status      RequestStatus @default(PENDING)
-  reason      String?       @db.Text
-  requestedBy String?       @map("requested_by")
-  decidedBy   String?       @map("decided_by")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime?     @map("updated_at")
-  invoice     Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id          BigInt   @id @default(autoincrement()) @map("UpdateRequestId")
+  invoiceId   BigInt   @map("UpdateRequestInvoiceId")
+  userId      Int      @map("UpdateRequestUserId") @db.SmallInt
+  createdDate DateTime @map("UpdateRequestCreatedDate") @db.Date
+  updatedDate DateTime @map("UpdateRequestUpdatedDate") @db.Date
+  /// 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELED'
+  status      String?  @map("UpdateRequestStatus") @db.VarChar(40)
 
-  @@map("update_requests")
+  @@map("updaterequest")
 }
 
-/// Daftar harga per Bill To; kontrak terbaru yang berlaku dipakai saat Create Invoice.
-model Kontrak {
-  id       Int           @id @default(autoincrement())
-  date     DateTime?     @db.Date
-  billToId Int           @map("bill_to_id")
-  alamat   String?
-  isi      String?       @db.Text
-  billTo   BillTo        @relation(fields: [billToId], references: [id])
-  items    KontrakItem[]
+model PrintQueue {
+  id            BigInt    @id @default(autoincrement()) @map("PrintQueueId")
+  created       DateTime? @map("PrintQueueCreated") @db.DateTime(0)
+  status        String?   @map("PrintQueueStatus") @db.VarChar(40)
+  startDateTime DateTime? @map("PrintQueueStartDateTime") @db.DateTime(0)
+  endDateTime   DateTime? @map("PrintQueueEndDateTime") @db.DateTime(0)
+  invoiceId     BigInt    @map("InvoiceId")
+  userId        Int       @map("UsersId") @db.SmallInt
+  url           String?   @map("PrintQueueURL") @db.VarChar(1000)
+  invoice       Invoice   @relation(fields: [invoiceId], references: [id], onUpdate: Restrict, map: "IPRINTQUEUE1")
+  user          User      @relation(fields: [userId], references: [id], onUpdate: Restrict, map: "IPRINTQUEUE2")
 
+  @@index([invoiceId], map: "IPRINTQUEUE1")
+  @@index([userId], map: "IPRINTQUEUE2")
+  @@map("printqueue")
+}
+
+/// Daftar harga per Bill To.
+model Kontrak {
+  id       Int             @id @default(autoincrement()) @map("KontrakId") @db.SmallInt
+  date     DateTime?       @map("KontrakDate") @db.Date
+  billToId Int             @map("BillToId") @db.SmallInt
+  nomor    String?         @map("KontrakNomor") @db.VarChar(40)
+  line     Int?            @map("KontrakLine") @db.SmallInt
+  billTo   BillTo          @relation(fields: [billToId], references: [id], onUpdate: Restrict, map: "IKONTRAK1")
+  details  KontrakDetail[]
+
+  @@index([billToId], map: "IKONTRAK1")
   @@map("kontrak")
 }
 
-model KontrakItem {
-  id          Int        @id @default(autoincrement())
-  kontrakId   Int        @map("kontrak_id")
-  seq         Int        @default(0)
-  keperluanId Int?       @map("keperluan_id")
-  description String
-  duration    String?
-  price       Decimal    @default(0) @db.Decimal(18, 2)
-  kontrak     Kontrak    @relation(fields: [kontrakId], references: [id], onDelete: Cascade)
-  keperluan   Keperluan? @relation(fields: [keperluanId], references: [id], onDelete: SetNull)
+model KontrakDetail {
+  kontrakId   Int       @map("KontrakId") @db.SmallInt
+  id          Int       @map("KontrakDetailId") @db.SmallInt
+  keperluanId Int       @map("KeperluanId") @db.SmallInt
+  duration    String    @map("KontrakDetailDuration") @db.VarChar(100)
+  price       BigInt?   @map("KontrakDetailPrice")
+  keperluan   Keperluan @relation(fields: [keperluanId], references: [id], onUpdate: Restrict, map: "IKONTRAKDETAIL1")
+  kontrak     Kontrak   @relation(fields: [kontrakId], references: [id], onUpdate: Restrict, map: "IKONTRAKDETAIL2")
 
-  @@map("kontrak_items")
+  @@id([kontrakId, id])
+  @@index([keperluanId], map: "IKONTRAKDETAIL1")
+  @@map("kontrakdetail")
 }
 
-// ───────────────────────── Email reminder & sistem ─────────────────────────
+// ───────────────────────── Email & sistem ─────────────────────────
 
+/// Template email reminder. Kategori ditentukan oleh id (lihat reminder.logic.ts).
 model EmailTemplate {
-  id          Int     @id @default(autoincrement())
-  code        String  @unique
-  description String?
-  subject     String?
-  body        String? @db.Text
+  id          Int      @id @default(autoincrement()) @map("EmailTemplateId") @db.SmallInt
+  description String   @map("EmailTemplateDescription") @db.VarChar(400)
+  subject     String   @map("EmailTemplateSubject") @db.VarChar(40)
+  /// HTML; @@ClientData@@ = tabel client, @@Keperluan@@ = nama keperluan.
+  content     String   @map("EmailTemplateContent") @db.VarChar(4000)
+  actions     Action[]
 
-  @@map("email_templates")
-}
-
-enum RecipientType {
-  TO
-  CC
-  BCC
+  @@map("emailtemplate")
 }
 
 model EmailRecipient {
-  id           Int           @id @default(autoincrement())
-  name         String?
-  email        String
-  type         RecipientType @default(TO)
-  /// Penerima reminder invoice (Pembuatan & Pembayaran Invoice).
-  isAccounting Boolean       @default(false) @map("is_accounting")
-  isActive     Boolean       @default(true) @map("is_active")
+  id           Int     @id @default(autoincrement()) @map("EmailRecipientId") @db.SmallInt
+  name         String  @map("EmailRecipientName") @db.VarChar(40)
+  address      String  @map("EmailRecipientAddress") @db.VarChar(100)
+  isActive     Boolean @map("IsActive")
+  isAccounting Boolean @default(false) @map("IsAccounting")
 
-  @@map("email_recipients")
+  @@map("emailrecipient")
 }
 
-model ReminderLog {
-  id         Int      @id @default(autoincrement())
-  createdAt  DateTime @default(now()) @map("created_at")
-  type       String
-  refKey     String?  @map("ref_key")
-  subject    String?
-  recipients String?  @db.Text
-  itemCount  Int?     @map("item_count")
-  status     String?
-  error      String?  @db.Text
+/// Key/value sistem, mis. "SMTP Host", "Site URL" (key berupa teks dengan spasi).
+model SystemConfigurator {
+  id    Int    @id @default(autoincrement()) @map("SystemConfiguratorId") @db.SmallInt
+  key   String @map("SystemConfiguratorKey") @db.VarChar(100)
+  value String @map("SystemConfiguratorValue") @db.VarChar(1000)
 
-  @@index([refKey])
-  @@map("reminder_logs")
+  @@map("systemconfigurator")
 }
 
-model SystemConfig {
-  key   String  @id
-  value String? @db.Text
+model SystemMessage {
+  id    Int    @id @default(autoincrement()) @map("SystemMessagesId") @db.SmallInt
+  alias String @map("SystemMessagesAlias") @db.VarChar(100)
+  value String @map("SystemMessagesValue") @db.VarChar(4000)
 
-  @@map("system_config")
+  @@map("systemmessages")
+}
+
+/// Automation: Action List aplikasi lama (belum dipakai aplikasi baru).
+model Action {
+  id                Int           @id @default(autoincrement()) @map("ActionId") @db.SmallInt
+  description       String        @map("ActionDescription") @db.VarChar(100)
+  daysBeforeExpired Int           @map("DaysBeforeExpired") @db.SmallInt
+  keperluanId       Int           @map("KeperluanId") @db.SmallInt
+  daysAfterProses   Int           @map("DaysAfterProses") @db.SmallInt
+  emailTemplateId   Int           @map("EmailTemplateId") @db.SmallInt
+  keperluan         Keperluan     @relation(fields: [keperluanId], references: [id], onUpdate: Restrict, map: "IACTION1")
+  emailTemplate     EmailTemplate @relation(fields: [emailTemplateId], references: [id], onUpdate: Restrict, map: "IACTION2")
+
+  @@index([keperluanId], map: "IACTION1")
+  @@index([emailTemplateId], map: "IACTION2")
+  @@map("action")
 }

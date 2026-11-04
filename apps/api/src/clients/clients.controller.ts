@@ -1,6 +1,3 @@
-import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   Body, Controller, Delete, Get, Header, HttpCode, Param, ParseIntPipe, Patch, Post, Query, Res, StreamableFile,
   UploadedFiles, UseInterceptors,
@@ -8,21 +5,16 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import type { ClientRow } from '@sml/shared';
 import { CurrentUser, Menu } from '../common/decorators.js';
 import { ListQueryDto } from '../common/list-query.dto.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { ArchiveDto, ClientDto, ClientListQueryDto, ConversationDto, CreateClientDto } from './clients.dto.js';
-import { ClientsService, UPLOAD_DIR } from './clients.service.js';
+import { ClientsService } from './clients.service.js';
 
-const upload = FilesInterceptor('files', 20, {
-  storage: diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (_req, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname).slice(0, 10)}`),
-  }),
-  limits: { fileSize: 20 * 1024 * 1024 },
-});
+// Lampiran disimpan sebagai blob di tabel attachment (seperti aplikasi lama), jadi file ditahan di memori.
+const upload = FilesInterceptor('files', 20, { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 const CSV_COLUMNS: [keyof ClientRow, string][] = [
   ['id', 'No'], ['sponsorName', 'Sponsor'], ['projectName', 'Project'], ['tanggalPermohonan', 'Tanggal Permohonan'],
@@ -82,16 +74,16 @@ export class ClientsController {
   @Get('attachments/:aid/file')
   async download(@Param('aid', ParseIntPipe) aid: number, @Res({ passthrough: true }) res: Response) {
     const a = await this.clients.attachment(aid);
-    res.setHeader('Content-Type', a.mime || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(a.originalName)}`);
-    return new StreamableFile(fs.createReadStream(a.file));
+    res.setHeader('Content-Type', a.mime);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(a.name)}`);
+    return new StreamableFile(a.data);
   }
 
   @Menu('clients')
   @Delete('attachments/:aid')
   @HttpCode(204)
   removeAttachment(@Param('aid', ParseIntPipe) aid: number, @CurrentUser() user: AuthUser) {
-    return this.clients.removeAttachment(aid, user.username);
+    return this.clients.removeAttachment(aid, user.id);
   }
 
   @Menu('clients')
@@ -103,34 +95,34 @@ export class ClientsController {
   @Menu('clients')
   @Post()
   create(@Body() dto: CreateClientDto, @CurrentUser() user: AuthUser) {
-    return this.clients.create(dto, user.username);
+    return this.clients.create(dto, user.id);
   }
 
   @Menu('clients')
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: ClientDto, @CurrentUser() user: AuthUser) {
-    return this.clients.update(id, dto, user.username);
+    return this.clients.update(id, dto, user.id);
   }
 
   @Menu('clients')
   @Delete(':id')
   @HttpCode(204)
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
-    return this.clients.remove(id, user.username);
+    return this.clients.remove(id, user.id);
   }
 
   @Menu('clients')
   @Post(':id/archive')
   @HttpCode(204)
   archive(@Param('id', ParseIntPipe) id: number, @Body() dto: ArchiveDto, @CurrentUser() user: AuthUser) {
-    return this.clients.archive(id, dto.archive, dto.reason, user.username);
+    return this.clients.archive(id, dto.archive, dto.reason, user.id);
   }
 
   /** Menulis catatan cukup hak lihat client (sama seperti production). */
   @Menu('clients', 'view')
   @Post(':id/conversations')
   addConversation(@Param('id', ParseIntPipe) id: number, @Body() dto: ConversationDto, @CurrentUser() user: AuthUser) {
-    return this.clients.addConversation(id, dto.message, user.fullname);
+    return this.clients.addConversation(id, dto.message, user.id);
   }
 
   @Menu('clients')
@@ -138,6 +130,6 @@ export class ClientsController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(upload)
   addAttachments(@Param('id', ParseIntPipe) id: number, @UploadedFiles() files: Express.Multer.File[], @CurrentUser() user: AuthUser) {
-    return this.clients.addAttachments(id, files, user.username);
+    return this.clients.addAttachments(id, files, user.id);
   }
 }

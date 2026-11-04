@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDate } from "@/lib/format";
 import { cancelRequest, decideRequest, requestEdit } from "../actions";
 import { RequestStatusBadge } from "../status-badge";
 
@@ -58,10 +58,11 @@ export function RequestActions({ detail, canEdit, canApprove }: { detail: Invoic
             <DialogTitle>Request To Edit</DialogTitle>
             <DialogDescription>Invoice {detail.no} berstatus {detail.status}. Setelah disetujui, invoice bisa diubah satu kali.</DialogDescription>
           </DialogHeader>
-          <Textarea rows={3} placeholder="Alasan perubahan" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus aria-label="Alasan request edit" />
+          <Textarea rows={3} placeholder="Alasan perubahan (opsional, untuk penyetuju)" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus aria-label="Alasan request edit" />
+          <p className="text-xs text-muted-foreground">Database lama tidak menyimpan alasan; sampaikan juga ke penyetuju bila penting.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Batal</Button>
-            <Button disabled={pending || !reason.trim()} onClick={() => run(() => requestEdit(detail.id, reason), "Request edit dikirim, menunggu persetujuan.")}>Kirim</Button>
+            <Button disabled={pending} onClick={() => run(() => requestEdit(detail.id, reason), "Request edit dikirim, menunggu persetujuan.")}>Kirim</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -77,16 +78,15 @@ export function RequestHistory({ detail }: { detail: InvoiceDetail }) {
       <CardContent className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Tanggal</TableHead><TableHead>Oleh</TableHead><TableHead>Alasan</TableHead><TableHead>Status</TableHead><TableHead>Diputuskan</TableHead></TableRow>
+            <TableRow><TableHead>Tanggal</TableHead><TableHead>Oleh</TableHead><TableHead>Status</TableHead><TableHead>Diperbarui</TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {detail.requests.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="whitespace-nowrap">{fmtDateTime(r.createdAt)}</TableCell>
+                <TableCell className="whitespace-nowrap">{fmtDate(r.createdAt)}</TableCell>
                 <TableCell>{r.requestedBy}</TableCell>
-                <TableCell className="min-w-48 whitespace-normal">{r.reason}</TableCell>
                 <TableCell><RequestStatusBadge status={r.status} /></TableCell>
-                <TableCell className="whitespace-nowrap">{[r.decidedBy, fmtDateTime(r.updatedAt)].filter(Boolean).join(" · ")}</TableCell>
+                <TableCell className="whitespace-nowrap">{fmtDate(r.updatedAt)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

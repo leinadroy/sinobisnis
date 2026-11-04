@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import bcrypt from 'bcryptjs';
 import type { Paginated, UserRow } from '@sml/shared';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { hashPassword } from '../auth/password.js';
+import { dt2s, GX_EMPTY_DATE } from '../common/dates.js';
 import { ListQueryDto, paginated } from '../common/list-query.dto.js';
 import type { CreateUserDto, UpdateUserDto } from './users.dto.js';
 
@@ -11,14 +12,14 @@ const SORTABLE: Record<string, (o: Prisma.SortOrder) => Prisma.UserOrderByWithRe
   username: (o) => ({ username: o }),
   email: (o) => ({ email: o }),
   isActive: (o) => ({ isActive: o }),
-  lastLogin: (o) => ({ lastLogin: { sort: o, nulls: 'last' } }),
+  lastLogin: (o) => ({ lastLogin: o }),
   roleName: (o) => ({ role: { name: o } }),
 };
 
 type UserWithRole = Prisma.UserGetPayload<{ include: { role: true } }>;
 const toRow = (u: UserWithRole): UserRow => ({
-  id: u.id, fullname: u.fullname, username: u.username, email: u.email, isActive: u.isActive,
-  lastLogin: u.lastLogin?.toISOString() ?? null, roleId: u.roleId, roleName: u.role?.name ?? null,
+  id: u.id, fullname: u.fullname, username: u.username, email: u.email || null, isActive: u.isActive,
+  lastLogin: dt2s(u.lastLogin), roleId: u.roleId, roleName: u.role.name,
 });
 
 @Injectable()
@@ -27,17 +28,13 @@ export class UsersService {
 
   async list(q: ListQueryDto): Promise<Paginated<UserRow>> {
     const s = q.search?.trim();
+    // Collation MariaDB (utf8_general_ci) sudah tidak membedakan huruf besar/kecil.
     const where: Prisma.UserWhereInput = s
-      ? { OR: [
-          { fullname: { contains: s, mode: 'insensitive' } },
-          { username: { contains: s, mode: 'insensitive' } },
-          { email: { contains: s, mode: 'insensitive' } },
-          { role: { name: { contains: s, mode: 'insensitive' } } },
-        ] }
+      ? { OR: [{ fullname: { contains: s } }, { username: { contains: s } }, { email: { contains: s } }, { role: { name: { contains: s } } }] }
       : {};
     const orderBy = (SORTABLE[q.sort ?? ''] ?? SORTABLE.fullname)(q.order);
     const [rows, total] = await Promise.all([
-      this.prisma.user.findMany({ where, orderBy, skip: q.skip, take: q.pageSize, include: { role: true } }),
+      this.prisma.user.findMany({ where, orderBy: [orderBy, { id: 'asc' }], skip: q.skip, take: q.pageSize, include: { role: true } }),
       this.prisma.user.count({ where }),
     ]);
     return paginated(rows.map(toRow), total, q);
@@ -49,52 +46,64 @@ export class UsersService {
     return toRow(u);
   }
 
+  /** Tabel users lama tidak punya index unik username, jadi dicek di sini. */
+  private async ensureUniqueUsername(username: string, exceptId?: number) {
+    const dup = await this.prisma.user.count({ where: { username, ...(exceptId ? { id: { not: exceptId } } : {}) } });
+    if (dup) throw new ConflictException('Username sudah dipakai.');
+  }
+
+  private async ensureRole(roleId: number | null | undefined) {
+    if (!roleId) throw new BadRequestException('Role wajib dipilih.');
+    if (!(await this.prisma.role.count({ where: { id: roleId } }))) throw new BadRequestException('Role tidak ditemukan.');
+  }
+
   async create(dto: CreateUserDto): Promise<UserRow> {
-    try {
-      const u = await this.prisma.user.create({
-        data: {
-          fullname: dto.fullname.trim(), username: dto.username.trim(), email: dto.email || null,
-          roleId: dto.roleId ?? null, isActive: dto.isActive ?? true, passwordHash: await bcrypt.hash(dto.password, 10),
-        },
-        include: { role: true },
-      });
-      return toRow(u);
-    } catch (e) {
-      throw this.mapError(e);
-    }
+    const username = dto.username.trim();
+    await this.ensureUniqueUsername(username);
+    await this.ensureRole(dto.roleId);
+    const u = await this.prisma.user.create({
+      data: {
+        fullname: dto.fullname.trim(), username, email: dto.email?.trim() || '', roleId: dto.roleId!, isActive: dto.isActive ?? true,
+        lastLogin: GX_EMPTY_DATE, ...(await hashPassword(dto.password)),
+      },
+      include: { role: true },
+    });
+    return toRow(u);
   }
 
   async update(id: number, dto: UpdateUserDto, currentUserId: number): Promise<UserRow> {
+    await this.get(id);
     if (id === currentUserId && dto.isActive === false) throw new BadRequestException('Tidak bisa menonaktifkan akun sendiri.');
     const data: Prisma.UserUncheckedUpdateInput = {};
     if (dto.fullname !== undefined) data.fullname = dto.fullname.trim();
-    if (dto.username !== undefined) data.username = dto.username.trim();
-    if (dto.email !== undefined) data.email = dto.email || null;
-    if (dto.roleId !== undefined) data.roleId = dto.roleId;
-    if (dto.isActive !== undefined) data.isActive = dto.isActive;
-    if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 10);
-    try {
-      const u = await this.prisma.user.update({ where: { id }, data, include: { role: true } });
-      return toRow(u);
-    } catch (e) {
-      throw this.mapError(e);
+    if (dto.username !== undefined) {
+      data.username = dto.username.trim();
+      await this.ensureUniqueUsername(data.username, id);
     }
+    if (dto.email !== undefined) data.email = dto.email?.trim() || '';
+    if (dto.roleId !== undefined) {
+      await this.ensureRole(dto.roleId);
+      data.roleId = dto.roleId!;
+    }
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.password) Object.assign(data, await hashPassword(dto.password));
+    const u = await this.prisma.user.update({ where: { id }, data, include: { role: true } });
+    return toRow(u);
   }
 
   async remove(id: number, currentUserId: number) {
     if (id === currentUserId) throw new BadRequestException('Tidak bisa menghapus akun sendiri.');
+    await this.get(id);
     try {
-      await this.prisma.user.delete({ where: { id } });
+      await this.prisma.$transaction([
+        this.prisma.userCookie.deleteMany({ where: { userId: id } }),
+        this.prisma.user.delete({ where: { id } }),
+      ]);
     } catch (e) {
-      throw this.mapError(e);
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ConflictException('User masih punya data terkait (catatan, notifikasi, antrian cetak). Nonaktifkan saja user ini.');
+      }
+      throw e;
     }
-  }
-
-  private mapError(e: unknown) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError) {
-      if (e.code === 'P2002') return new ConflictException('Username sudah dipakai.');
-      if (e.code === 'P2025') return new NotFoundException('User tidak ditemukan.');
-    }
-    return e;
   }
 }
