@@ -59,7 +59,8 @@ export interface ClientAttachmentRow {
   originalName: string;
   mime: string | null;
   size: number | null;
-  uploadedAt: string;
+  /** Tabel attachment lama tidak menyimpan waktu unggah. */
+  uploadedAt: string | null;
 }
 
 export interface ConversationRow {
@@ -80,8 +81,9 @@ export interface ClientLogRow {
 
 export interface ClientDetail extends ClientRow {
   pembayaranPnbp: string | null;
-  createdAt: string;
-  updatedAt: string;
+  /** Dari log pertama/terakhir (tabel client lama tidak punya kolom waktu). */
+  createdAt: string | null;
+  updatedAt: string | null;
   attachments: ClientAttachmentRow[];
   conversations: ConversationRow[];
   history: { id: number; historyDate: string; userName: string | null; action: string }[];

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable } from "@/components/data-table/data-table";
 import { RecordCard } from "@/components/data-table/record-card";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDate } from "@/lib/format";
 import { decideRequest } from "../actions";
 import { RequestStatusBadge } from "../status-badge";
 
@@ -42,12 +42,11 @@ export function RequestsTable({ list, status, canDecide, username }: { list: Pag
   const items = [{ value: "ALL", label: "Semua status" }, ...REQUEST_STATUSES.map((s) => ({ value: s, label: s }))];
 
   const base: ColumnDef<UpdateRequestRow, unknown>[] = [
-    { id: "createdAt", header: "Tanggal", cell: ({ row }) => <span className="whitespace-nowrap">{fmtDateTime(row.original.createdAt)}</span> },
+    { id: "createdAt", header: "Tanggal", cell: ({ row }) => <span className="whitespace-nowrap">{fmtDate(row.original.createdAt)}</span> },
     { id: "invoiceNo", header: "Invoice", cell: ({ row }) => <Link href={`/invoices/${row.original.invoiceId}`} className="font-medium text-primary hover:underline">{row.original.invoiceNo ?? `#${row.original.invoiceId}`}</Link> },
     { id: "requestedBy", accessorKey: "requestedBy", header: "Oleh" },
-    { id: "reason", header: "Alasan", cell: ({ row }) => <span className="line-clamp-3 min-w-56 whitespace-normal">{row.original.reason}</span> },
     { id: "status", header: "Status", cell: ({ row }) => <RequestStatusBadge status={row.original.status} /> },
-    { id: "decided", header: "Diputuskan", cell: ({ row }) => <span className="whitespace-nowrap">{[row.original.decidedBy, fmtDateTime(row.original.updatedAt)].filter(Boolean).join(" · ")}</span> },
+    { id: "updated", header: "Diperbarui", cell: ({ row }) => <span className="whitespace-nowrap">{fmtDate(row.original.updatedAt)}</span> },
     ...(canDecide ? [{ id: "actions", header: "", cell: ({ row }: { row: { original: UpdateRequestRow } }) => <Decide r={row.original} username={username} /> }] : []),
   ];
   const columns = base.map((c) => ({ ...c, enableSorting: false, meta: { label: typeof c.header === "string" ? c.header : c.id } }));
@@ -59,7 +58,7 @@ export function RequestsTable({ list, status, canDecide, username }: { list: Pag
       total={list.total}
       page={list.page}
       pageSize={list.pageSize}
-      searchPlaceholder="Cari no invoice, user, alasan…"
+      searchPlaceholder="Cari no invoice, user…"
       toolbar={
         <Select items={items} value={status} onValueChange={(v) => {
           const next = new URLSearchParams(params.toString());
@@ -76,10 +75,9 @@ export function RequestsTable({ list, status, canDecide, username }: { list: Pag
           title={<Link href={`/invoices/${r.invoiceId}`} className="text-primary hover:underline">{r.invoiceNo ?? `#${r.invoiceId}`}</Link>}
           fields={[
             ["Status", <RequestStatusBadge key="s" status={r.status} />],
-            ["Tanggal", fmtDateTime(r.createdAt)],
+            ["Tanggal", fmtDate(r.createdAt)],
             ["Oleh", r.requestedBy],
-            ["Alasan", r.reason],
-            ["Diputuskan", [r.decidedBy, fmtDateTime(r.updatedAt)].filter(Boolean).join(" · ")],
+            ["Diperbarui", fmtDate(r.updatedAt)],
           ]}
           actions={canDecide ? <Decide r={r} username={username} /> : undefined}
         />

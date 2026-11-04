@@ -12,6 +12,7 @@ function toBody(slug: string, values: FormValues) {
   if (!entity) throw new Error("Master data tidak dikenal.");
   const body: Record<string, unknown> = {};
   for (const f of entity.fields) {
+    if (f.readOnly) continue;
     const v = values[f.name];
     if (f.type === "checkbox") body[f.name] = Boolean(v);
     else if (f.type === "number") body[f.name] = v === "" || v === undefined ? null : Number(v);

@@ -21,7 +21,7 @@ type Values = Record<string, string | boolean>;
 
 /** Skema zod dibangun dari definisi field master (wajib, angka). */
 function schemaFor(fields: MasterField[]) {
-  return z.object(Object.fromEntries(fields.map((f) => {
+  return z.object(Object.fromEntries(fields.filter((f) => !f.readOnly).map((f) => {
     if (f.type === "checkbox") return [f.name, z.boolean()];
     let s = z.string();
     if (f.required) s = s.trim().min(1, `${f.label} wajib diisi.`);
@@ -60,7 +60,7 @@ export function MasterForm({ entity, id, initial, options, canEdit }: {
         <CardContent>
           <fieldset disabled={!canEdit || pending}>
             <FieldGroup className="grid gap-5 md:grid-cols-2">
-              {entity.fields.map((f) => {
+              {entity.fields.filter((f) => !f.readOnly).map((f) => {
                 const err = errors[f.name];
                 const wide = f.type === "textarea";
                 return (

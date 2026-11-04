@@ -1,19 +1,23 @@
 import { computeInvoiceTotals, formatInvoiceNo, taxValue, terbilang, terbilangEn } from '@sml/shared';
 
 // Aturan hitung invoice di packages/shared (dipakai API untuk menyimpan dan web untuk total di form).
-describe('formatInvoiceNo', () => {
-  it('mengganti semua placeholder', () => {
-    expect(formatInvoiceNo('{NO}/SML/{ROMAWI}/{YYYY}', 7, '2026-11-02')).toBe('0007/SML/XI/2026');
-    expect(formatInvoiceNo('INV-{YY}{MM}-{NO}', 123, '2026-01-31')).toBe('INV-2601-0123');
+describe('formatInvoiceNo (format GeneXus CompanyInvoiceNoFormat)', () => {
+  const SML = '@YY@@autonumber@/SML/@ROM@/@YYYY@';
+
+  it('mengganti semua token', () => {
+    expect(formatInvoiceNo(SML, 373, '2026-11-03')).toBe('26373/SML/XI/2026');
+    expect(formatInvoiceNo('@YY@@autonumber@/RTS/@ROM@/@YYYY@', 7, '2027-01-05')).toBe('27007/RTS/I/2027');
+    expect(formatInvoiceNo('INV-@YYYY@@MM@-@autonumber@', 12, '2026-02-01')).toBe('INV-202602-012');
   });
 
-  it('nomor lebih dari 4 digit tidak dipotong', () => {
-    expect(formatInvoiceNo('{NO}', 12345, '2026-12-01')).toBe('12345');
+  it('nomor lebih dari 3 digit tidak dipotong', () => {
+    expect(formatInvoiceNo(SML, 1234, '2026-02-01')).toBe('261234/SML/II/2026');
   });
 
   it('format kosong → nomor saja', () => {
-    expect(formatInvoiceNo('', 5, '2026-03-01')).toBe('0005');
+    expect(formatInvoiceNo('', 5, '2026-03-01')).toBe('005');
   });
+
 });
 
 describe('taxValue', () => {

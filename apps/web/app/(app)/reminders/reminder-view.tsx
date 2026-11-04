@@ -7,7 +7,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { AlertTriangle, Bell, CalendarClock, CheckCircle2, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
-  daysUntil, REMINDER_DAY_LABELS, REMINDER_LABELS, REMINDER_TYPES,
+  REMINDER_DAY_LABELS, REMINDER_LABELS, REMINDER_TYPES,
   type ReminderItem, type ReminderLogList, type ReminderLogRow, type ReminderOverview, type ReminderRunResult, type ReminderType,
 } from "@sml/shared";
 import {
@@ -71,13 +71,13 @@ export function ReminderStatus({ overview, canRun, canConfigure }: { overview: R
         <ul className="space-y-1 text-sm">
           {check(smtpConfigured, smtpConfigured ? "SMTP sudah diatur." : "SMTP belum diatur — email tidak akan terkirim (tercatat NOT SENT).")}
           {check(recipients.general + recipients.accounting > 0,
-            <>Penerima TO aktif: {recipients.general} umum, {recipients.accounting} accounting{recipients.general + recipients.accounting === 0 && " — tambahkan di Email Recipient"}.</>)}
+            <>Penerima aktif: {recipients.general} umum, {recipients.accounting} accounting{recipients.general + recipients.accounting === 0 && " — tambahkan di Email Recipient"}.</>)}
           {check(schedule.enabled && !schedule.error && !!schedule.nextRun, (
             <span className="inline-flex flex-wrap items-center gap-1">
               <CalendarClock className="size-3.5" />
               {schedule.error ? schedule.error
                 : schedule.enabled ? <>Otomatis <code className="rounded bg-muted px-1">{schedule.cron}</code> ({schedule.timezone}), berikutnya <b>{fmtDateTime(schedule.nextRun)}</b>.</>
-                : "Reminder otomatis nonaktif (REMINDER_ENABLED = 0)."}
+                : "Reminder otomatis nonaktif (Reminder Enabled = 0 di System Configurator)."}
             </span>
           ))}
         </ul>
@@ -96,7 +96,7 @@ export function ReminderStatus({ overview, canRun, canConfigure }: { overview: R
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Kirim ulang semua reminder?</AlertDialogTitle>
-            <AlertDialogDescription>Semua kategori yang punya client akan dikirim lagi walaupun sudah terkirim hari ini. Penerima bisa mendapat email ganda.</AlertDialogDescription>
+            <AlertDialogDescription>Semua kategori & Keperluan yang punya client hari ini akan dikirim lagi walaupun sudah terkirim. Penerima bisa mendapat email ganda.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
@@ -129,12 +129,12 @@ export function ReminderTabs({ overview, tab }: { overview: ReminderOverview; ta
 /** Warna baris kategori expired, sama dengan list client. */
 function rowTone(type: ReminderType, r: ReminderItem) {
   if (!type.startsWith("EXPIRED") || r.days === null) return undefined;
-  return r.days < 0 ? "bg-red-50" : r.days <= 30 ? "bg-orange-50" : "bg-yellow-50";
+  return r.days <= 30 ? "bg-orange-50" : "bg-yellow-50";
 }
 
 export function ReminderItemsTable({ type, items }: { type: ReminderType; items: ReminderItem[] }) {
   const dayLabel = REMINDER_DAY_LABELS[type];
-  const days = (r: ReminderItem) => (r.days === null ? "" : type.startsWith("EXPIRED") && r.days < 0 ? `lewat ${-r.days}` : String(r.days));
+  const days = (r: ReminderItem) => (r.days === null ? "" : String(r.days));
   if (!items.length) return <p className="rounded-lg border py-10 text-center text-sm text-muted-foreground">Tidak ada client untuk kategori ini.</p>;
   return (
     <>
@@ -178,7 +178,7 @@ export function ReminderItemsTable({ type, items }: { type: ReminderType; items:
           </TableBody>
         </Table>
       </div>
-      <p className="text-xs text-muted-foreground">{items.length} client{type.startsWith("EXPIRED") && items.some((r) => (daysUntil(r.expiredDokumen) ?? 0) < 0) && " · merah = sudah expired"}</p>
+      <p className="text-xs text-muted-foreground">{items.length} client · {new Set(items.map((r) => r.keperluanId)).size} Keperluan (satu email per Keperluan)</p>
     </>
   );
 }
@@ -186,10 +186,10 @@ export function ReminderItemsTable({ type, items }: { type: ReminderType; items:
 const logColumns: ColumnDef<ReminderLogRow, unknown>[] = ([
   { id: "createdAt", header: "Waktu", cell: ({ row }) => <span className="whitespace-nowrap">{fmtDateTime(row.original.createdAt)}</span> },
   { id: "type", header: "Kategori", cell: ({ row }) => <span className="whitespace-nowrap">{REMINDER_LABELS[row.original.type as ReminderType] ?? row.original.type}</span> },
-  { id: "subject", header: "Subject", cell: ({ row }) => <span className="line-clamp-2 min-w-56 whitespace-normal">{row.original.subject}</span> },
-  { id: "recipients", header: "Penerima", cell: ({ row }) => <span className="line-clamp-2 min-w-48 whitespace-normal text-xs">{row.original.recipients}</span> },
+  { id: "keperluan", header: "Keperluan", cell: ({ row }) => <span className="line-clamp-2 min-w-48 whitespace-normal" title={row.original.text}>{row.original.keperluan ?? row.original.text}</span> },
   { id: "itemCount", header: "Jumlah", cell: ({ row }) => <span className="tabular-nums">{row.original.itemCount}</span> },
   { id: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
+  { id: "runBy", header: "Oleh", cell: ({ row }) => row.original.runBy },
   { id: "error", header: "Error", cell: ({ row }) => <span className="line-clamp-2 min-w-48 whitespace-normal text-xs text-destructive">{row.original.error}</span> },
 ] satisfies ColumnDef<ReminderLogRow, unknown>[]).map((c) => ({ ...c, enableSorting: false, meta: { label: c.header } }));
 
@@ -206,8 +206,9 @@ export function ReminderLogTable({ list }: { list: ReminderLogList }) {
       total={list.total}
       page={list.page}
       pageSize={list.pageSize}
-      searchPlaceholder="Cari subject, penerima, error…"
+      searchPlaceholder="Cari Keperluan, user, error…"
       toolbar={
+        <>
         <Select items={items} value={params.get("status") ?? ""} onValueChange={(v) => {
           const next = new URLSearchParams(params.toString());
           if (v) next.set("status", v); else next.delete("status");
@@ -217,11 +218,21 @@ export function ReminderLogTable({ list }: { list: ReminderLogList }) {
           <SelectTrigger className="w-40" aria-label="Status" disabled={pending}><SelectValue /></SelectTrigger>
           <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
         </Select>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" className="size-4 accent-primary" checked={params.get("empty") === "1"} disabled={pending} onChange={(e) => {
+            const next = new URLSearchParams(params.toString());
+            if (e.target.checked) next.set("empty", "1"); else next.delete("empty");
+            next.set("page", "1");
+            start(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
+          }} />
+          Tampilkan log 0 items
+        </label>
+        </>
       }
       renderCard={(r) => (
         <RecordCard
           title={<span>{REMINDER_LABELS[r.type as ReminderType] ?? r.type}</span>}
-          fields={[["Status", <StatusBadge key="s" status={r.status} />], ["Waktu", fmtDateTime(r.createdAt)], ["Jumlah", String(r.itemCount ?? "")], ["Penerima", r.recipients], ["Error", r.error]]}
+          fields={[["Status", <StatusBadge key="s" status={r.status} />], ["Waktu", fmtDateTime(r.createdAt)], ["Keperluan", r.keperluan], ["Jumlah", String(r.itemCount ?? "")], ["Oleh", r.runBy], ["Error", r.error]]}
         />
       )}
     />

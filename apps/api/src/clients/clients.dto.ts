@@ -14,7 +14,7 @@ const Text = (max = 500) => (target: object, key: string) => {
   IsOptional()(target, key);
   Nullable()(target, key);
   IsString()(target, key);
-  MaxLength(max)(target, key);
+  MaxLength(max, { message: `${key} maksimal ${max} karakter.` })(target, key);
 };
 const RefId = () => (target: object, key: string) => {
   IsOptional()(target, key);
@@ -27,42 +27,42 @@ export class ClientDto {
   @DateField() tanggalPermohonan?: string | null;
   @RefId() sponsorId?: number | null;
   @RefId() projectId?: number | null;
-  @IsOptional() @IsString() @IsNotEmpty({ message: 'Nama Client wajib diisi.' }) @MaxLength(200) name?: string;
-  @Text(50) noPaspor?: string | null;
+  @IsOptional() @IsString() @IsNotEmpty({ message: 'Nama Client wajib diisi.' }) @MaxLength(40, { message: 'Nama Client maksimal 40 karakter.' }) name?: string;
+  @Text(40) noPaspor?: string | null;
   @DateField() tanggalLahir?: string | null;
   @RefId() keperluanId?: number | null;
-  @Text(100) noRptka?: string | null;
+  @Text(40) noRptka?: string | null;
   @DateField() pembayaranPnbp?: string | null;
-  @Text(100) permohonanHariKe3?: string | null;
+  @Text(40) permohonanHariKe3?: string | null;
   @DateField() tanggalProsesSelesai?: string | null;
   @DateField() tanggalTerbitDokumen?: string | null;
   @DateField() tanggalMasukLastExp?: string | null;
   @DateField() expiredDokumen?: string | null;
-  @Text(100) epo?: string | null;
-  @Text(100) noInvoice?: string | null;
+  @Text(40) epo?: string | null;
+  @Text(40) noInvoice?: string | null;
   @DateField() tanggalInvoice?: string | null;
   @DateField() tanggalPembayaranInvoice?: string | null;
-  @Text(200) prosesPerpanjangan?: string | null;
-  @Text(100) sktt?: string | null;
-  @Text(100) stm?: string | null;
-  @Text(100) status?: string | null;
-  @Text(5000) keteranganTka?: string | null;
+  @Text(40) prosesPerpanjangan?: string | null;
+  @Text(40) sktt?: string | null;
+  @Text(40) stm?: string | null;
+  @Text(40) status?: string | null;
+  @Text(4000) keteranganTka?: string | null;
   @IsOptional() @IsBoolean() isArchived?: boolean;
-  @Text(500) archivedReason?: string | null;
+  @Text(100) archivedReason?: string | null;
 }
 
 /** Saat membuat client, nama wajib. */
 export class CreateClientDto extends ClientDto {
-  @IsString() @IsNotEmpty({ message: 'Nama Client wajib diisi.' }) @MaxLength(200) declare name: string;
+  @IsString() @IsNotEmpty({ message: 'Nama Client wajib diisi.' }) @MaxLength(40, { message: 'Nama Client maksimal 40 karakter.' }) declare name: string;
 }
 
 export class ArchiveDto {
   @IsBoolean() archive: boolean;
-  @IsOptional() @IsString() @MaxLength(500) reason?: string;
+  @IsOptional() @IsString() @MaxLength(100) reason?: string;
 }
 
 export class ConversationDto {
-  @IsString() @IsNotEmpty({ message: 'Pesan tidak boleh kosong.' }) @MaxLength(5000) message: string;
+  @IsString() @IsNotEmpty({ message: 'Pesan tidak boleh kosong.' }) @MaxLength(1000) message: string;
 }
 
 const toBool = ({ value }: { value: unknown }) => value === true || value === 'true' || value === '1';

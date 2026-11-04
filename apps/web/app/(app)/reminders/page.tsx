@@ -21,6 +21,7 @@ export default async function RemindersPage({ searchParams }: PageProps<"/remind
   if (tab === "log") {
     const q = new URLSearchParams(listQuery(sp, { pageSize: 50 }).qs);
     if (typeof sp.status === "string" && sp.status) q.set("status", sp.status);
+    if (sp.empty === "1") q.set("withEmpty", "1");
     logs = await apiFetch<ReminderLogList>(`/reminders/logs?${q}`);
   } else {
     items = await apiFetch<ReminderItem[]>(`/reminders/items?type=${tab}`);
@@ -28,7 +29,7 @@ export default async function RemindersPage({ searchParams }: PageProps<"/remind
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Email Reminder" description="Daftar client yang perlu ditindaklanjuti. Hari reminder diatur per Keperluan; email dikirim ke Email Recipient memakai Email Template." />
+      <PageHeader title="Email Reminder" description="Client yang hari ini tepat jatuh pada hari reminder Keperluan-nya (nilai 0 di Keperluan = nonaktif). Satu email per kategori per Keperluan ke Email Recipient, memakai Email Template." />
       <ReminderStatus overview={overview} canRun={edit} canConfigure={canView(me.access, "system-config")} />
       <ReminderTabs overview={overview} tab={tab} />
       {tab === "log" ? (

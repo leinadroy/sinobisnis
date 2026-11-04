@@ -26,12 +26,9 @@ export function KontrakTable({ list, canEdit }: { list: Paginated<KontrakRow>; c
       cell: ({ row }) => <span className="whitespace-nowrap">{fmtDate(row.original.date) || "—"}</span> },
     { id: "billToName", accessorKey: "billToName", meta: { label: "Bill To" }, header: ({ column }) => <SortHeader column={column} title="Bill To" />,
       cell: ({ row }) => <Link href={`/kontrak/${row.original.id}`} className="font-medium text-primary hover:underline">{row.original.billToName}</Link> },
-    { id: "alamat", accessorKey: "alamat", meta: { label: "Alamat" }, header: "Alamat", enableSorting: false,
-      cell: ({ row }) => <span className="line-clamp-2 min-w-48 whitespace-normal">{row.original.alamat}</span> },
+    { id: "nomor", accessorKey: "nomor", meta: { label: "Nomor" }, header: "Nomor", enableSorting: false },
     { id: "itemCount", accessorKey: "itemCount", meta: { label: "Item Harga" }, header: ({ column }) => <SortHeader column={column} title="Item Harga" />,
       cell: ({ row }) => <span className="tabular-nums">{row.original.itemCount}</span> },
-    { id: "isi", accessorKey: "isi", meta: { label: "Isi" }, header: "Isi", enableSorting: false,
-      cell: ({ row }) => <span className="line-clamp-2 min-w-48 whitespace-normal">{row.original.isi}</span> },
     { id: "actions", header: "", enableHiding: false, enableSorting: false, cell: ({ row }) => <div className="flex justify-end gap-1">{actions(row.original)}</div> },
   ];
   return (
@@ -41,12 +38,12 @@ export function KontrakTable({ list, canEdit }: { list: Paginated<KontrakRow>; c
       total={list.total}
       page={list.page}
       pageSize={list.pageSize}
-      searchPlaceholder="Cari bill to, alamat, isi…"
+      searchPlaceholder="Cari bill to, nomor kontrak…"
       toolbar={canEdit && <Button nativeButton={false} render={<Link href="/kontrak/new" />}><Plus /> Insert</Button>}
       renderCard={(r) => (
         <RecordCard
           title={<Link href={`/kontrak/${r.id}`} className="text-primary hover:underline">{r.billToName}</Link>}
-          fields={[["Tanggal", fmtDate(r.date)], ["Item Harga", String(r.itemCount)], ["Alamat", r.alamat]]}
+          fields={[["Tanggal", fmtDate(r.date)], ["Nomor", r.nomor], ["Item Harga", String(r.itemCount)]]}
           actions={actions(r)}
         />
       )}

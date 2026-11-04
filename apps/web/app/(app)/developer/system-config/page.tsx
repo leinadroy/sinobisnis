@@ -13,7 +13,7 @@ export default async function SystemConfigPage() {
   const rows = await apiFetch<SystemConfigRow[]>("/system-config");
   return (
     <div>
-      <PageHeader title="System Configurator" description="Pengaturan aplikasi: SMTP email, jadwal reminder, dan nilai default invoice. Perubahan REMINDER_* langsung memuat ulang jadwal." />
+      <PageHeader title="System Configurator" description="Pengaturan aplikasi: SMTP email, jadwal reminder, dan nilai default invoice. Memakai tabel systemconfigurator aplikasi lama; perubahan key Reminder … langsung memuat ulang jadwal." />
       <SystemConfigEditor rows={rows} canEdit={edit} />
     </div>
   );

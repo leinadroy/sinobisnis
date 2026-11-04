@@ -2,9 +2,12 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { map } from 'rxjs';
 import { Prisma } from '../generated/prisma/client.js';
 
-/** Ubah Prisma.Decimal menjadi number di semua response (nominal & persentase cukup presisi untuk double). */
+/**
+ * Ubah Prisma.Decimal dan BigInt menjadi number di semua response (ID & nominal rupiah jauh di bawah 2^53).
+ */
 function convert(value: unknown): unknown {
   if (value instanceof Prisma.Decimal) return value.toNumber();
+  if (typeof value === 'bigint') return Number(value);
   if (value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map(convert);
   // Hanya objek polos (bukan Date, StreamableFile, Buffer, dll.).

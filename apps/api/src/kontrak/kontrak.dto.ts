@@ -3,10 +3,9 @@ import { ArrayMaxSize, IsArray, IsInt, IsNumber, IsOptional, IsString, Matches, 
 
 const Nullable = () => ValidateIf((_, v) => v !== null && v !== undefined && v !== '');
 
+/** Satu baris kontrakdetail: harga untuk satu Keperluan. */
 export class KontrakItemDto {
-  @IsOptional() @Nullable() @IsInt() keperluanId: number | null;
-  /** Kosong = pakai nama Keperluan. */
-  @IsOptional() @IsString() @MaxLength(500) description: string;
+  @IsInt({ message: 'Keperluan wajib dipilih.' }) keperluanId: number;
   @IsOptional() @Nullable() @IsString() @MaxLength(100) duration: string | null;
   @IsNumber({}, { message: 'Price harus berupa angka.' }) @Min(0, { message: 'Price tidak boleh negatif.' }) @Max(1e15) price: number;
 }
@@ -15,8 +14,6 @@ export class KontrakItemDto {
 export class KontrakDto {
   @IsOptional() @Nullable() @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Tanggal kontrak harus berformat YYYY-MM-DD.' }) date: string | null;
   @IsInt({ message: 'Bill To wajib dipilih.' }) billToId: number;
-  /** Kosong = alamat Bill To. */
-  @IsOptional() @Nullable() @IsString() @MaxLength(1000) alamat: string | null;
-  @IsOptional() @Nullable() @IsString() @MaxLength(20000) isi: string | null;
+  @IsOptional() @Nullable() @IsString() @MaxLength(40) nomor: string | null;
   @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => KontrakItemDto) items: KontrakItemDto[];
 }

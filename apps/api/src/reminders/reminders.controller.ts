@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { REMINDER_TYPES, type ReminderOverview, type ReminderType } from '@sml/shared';
-import { Menu } from '../common/decorators.js';
+import { CurrentUser, Menu } from '../common/decorators.js';
+import type { AuthUser } from '../auth/auth.types.js';
 import { ReminderScheduler } from './reminder-scheduler.service.js';
 import { CreateSystemConfigDto, ReminderItemsQueryDto, ReminderLogQueryDto, RunReminderDto, SystemConfigValueDto, TestEmailDto } from './reminders.dto.js';
 import { RemindersService } from './reminders.service.js';
@@ -21,7 +22,7 @@ export class RemindersController {
     return {
       counts: Object.fromEntries(REMINDER_TYPES.map((t) => [t, items[t].length])) as Record<ReminderType, number>,
       schedule: this.scheduler.status(),
-      smtpConfigured: Boolean(cfg.SMTP_HOST?.trim()),
+      smtpConfigured: Boolean(cfg['SMTP Host']?.trim()),
       recipients,
     };
   }
@@ -37,8 +38,8 @@ export class RemindersController {
   }
 
   @Post('run')
-  run(@Body() dto: RunReminderDto) {
-    return this.reminders.run(Boolean(dto.force));
+  run(@Body() dto: RunReminderDto, @CurrentUser() user: AuthUser) {
+    return this.reminders.run(Boolean(dto.force), { userId: user.id, name: user.username });
   }
 
   @Post('reload-schedule')
