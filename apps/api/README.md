@@ -30,6 +30,20 @@ Standar: [`docs/tech-stack.md`](../../docs/tech-stack.md).
    python tools/migrate/clone_production.py verify          # bandingkan struktur & jumlah baris
    ```
    Script menolak host selain localhost.
+
+   **Staging bersama** (server 10.10.3.62, MySQL 8, database `sinobisnis_staging`): isi `STAGING_DB_*` di `.env` root, lalu
+   ```bash
+   python tools/migrate/clone_production.py all --target staging --replace --blob-latest 10
+   ```
+   Semua data disalin. Tabel lampiran diisi sebagian dengan isi file: 10 `attachment` terbaru, lampiran 10
+   `invoiceattachment` terbaru diperluas ke seluruh invoice-nya, plus semua file yang dirujuk (lampiran invoice umumnya
+   rujukan ke `attachment`), supaya PDF Invoice + Lampiran invoice itu lengkap. Isi ulang tabel lampiran saja:
+   `python tools/migrate/clone_production.py blobs --target staging --blob-latest 10`.
+   Lampiran lengkap semua invoice di rentang tanggal (menambah, bisa diulang, dicek per invoice terhadap production):
+   `python tools/migrate/clone_production.py invoice-attachments --target staging --from 2026-10-01 --to 2026-11-30`.
+   Script hanya mau menghapus/membuat database yang namanya mengandung "staging" dan menolak host production. Aplikasi
+   berjalan di MySQL 8 tanpa perubahan (adapter MariaDB Prisma tetap dipakai); profil hanya-baca saat ini hanya untuk
+   MariaDB (`max_statement_time`).
 3. Salin `.env.example` → `.env` di folder ini; isi `DATABASE_URL` (`mysql://user:password@localhost:3306/sinobisnis`,
    password di-URL-encode) dan `JWT_SECRET`.
 4. Dari akar monorepo:

@@ -81,9 +81,10 @@ const DB_BADGE: Record<DbActive["tone"], string> = {
 /** Label database aktif di header, supaya selalu jelas data mana yang sedang diubah. */
 function DbBadge({ db, link }: { db: DbActive; link: boolean }) {
   const text = (
-    <span className={`inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs font-semibold uppercase tracking-wide ${DB_BADGE[db.tone]}`}
+    <span className={`inline-flex h-6 max-w-[34vw] items-center gap-1 rounded-md border px-2 text-xs font-semibold uppercase tracking-wide sm:max-w-none ${DB_BADGE[db.tone]}`}
       title={`Database: ${db.label}${db.host ? ` — ${db.host}/${db.database ?? ""}` : ""}`}>
-      <Database className="size-3.5" /> {db.label}{db.readOnly && <span className="font-normal normal-case">· hanya baca</span>}
+      <Database className="size-3.5 shrink-0" /> <span className="truncate">{db.label}</span>
+      {db.readOnly && <span className="hidden font-normal normal-case whitespace-nowrap md:inline">· hanya baca</span>}
     </span>
   );
   return link ? <Link href="/developer/database" aria-label={`Database aktif: ${db.label}`}>{text}</Link> : text;
@@ -100,7 +101,7 @@ export function AppShell({ nav, user, database, showDbLink, children }: {
           <MenuIcon className="size-5" />
         </Button>
         <Link href="/" className="shrink-0"><Image src="/logo.svg" alt="Sinobisnis Mitra Lestari" width={220} height={44} className="h-8 w-auto md:h-10" priority /></Link>
-        <div className="ml-auto"><DbBadge db={database} link={showDbLink} /></div>
+        <div className="ml-auto min-w-0"><DbBadge db={database} link={showDbLink} /></div>
         <div className="hidden text-sm text-muted-foreground sm:block">
           {user.fullname} <span className="text-xs">({user.roleName ?? "tanpa role"})</span>
         </div>

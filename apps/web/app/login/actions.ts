@@ -16,7 +16,8 @@ export async function login(values: LoginValues, next?: string) {
   (await cookies()).set(TOKEN_COOKIE, res.data!.accessToken, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // Production default: cookie hanya lewat HTTPS. COOKIE_SECURE=0 untuk server yang (sementara) diakses lewat http://.
+    secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === "1" : process.env.NODE_ENV === "production",
     path: "/",
     maxAge: res.data!.expiresIn,
   });

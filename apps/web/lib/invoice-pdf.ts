@@ -47,7 +47,13 @@ export async function renderInvoicePdf(invoiceId: number, token: string): Promis
     await browser.setCookie({ name: TOKEN_COOKIE, value: token, domain: new URL(origin).hostname, path: "/", httpOnly: true });
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 1800 });
-    const res = await page.goto(`${origin}/print/invoices/${invoiceId}`, { waitUntil: "networkidle0", timeout: 60_000 });
+    const url = `${origin}/print/invoices/${invoiceId}`;
+    let res = await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
+    // Gangguan sesaat (mis. halaman baru dikompilasi server development, atau API sedang restart): coba sekali lagi.
+    if (!res || res.status() >= 500) {
+      await new Promise((r) => setTimeout(r, 1500));
+      res = await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
+    }
     if (!res || !res.ok()) throw new PdfError(res?.status() === 404 ? "Invoice tidak ditemukan." : `Halaman cetak gagal dimuat (${res?.status() ?? "tanpa respons"}).`, res?.status() === 404 ? 404 : 502);
     if (new URL(page.url()).pathname.startsWith("/login")) throw new PdfError("Sesi login habis. Silakan login ulang.", 401);
     await page.waitForSelector(".invoice-print .page", { timeout: 15_000 });

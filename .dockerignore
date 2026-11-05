@@ -1,0 +1,32 @@
+# Konteks build Docker = root repo. Hanya kode aplikasi baru (apps/api, apps/web, packages/shared) yang dibutuhkan.
+**/node_modules
+**/dist
+**/.next
+**/*.tsbuildinfo
+apps/api/src/generated
+
+# Rahasia & data pribadi: tidak boleh masuk image
+.env
+**/.env
+**/.env.*
+!**/.env.example
+sml_apps.txt
+output
+apps/api/storage
+apps/api/config/db-profile.json
+apps/api/config/*.log
+**/*.pdf
+**/*.zip
+**/*.csv
+**/*.xlsx
+
+# Tidak dipakai di container
+.git
+.claude
+apps/invoice-printer
+apps/invoice-web
+tools
+docs
+scripts
+logs
+**/__pycache__

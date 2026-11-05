@@ -1,0 +1,55 @@
+# Sinobisnis di Docker (server Linux). Panduan: docs/deploy-docker.md
+#   docker compose up -d --build
+# Database TIDAK ikut di sini: API konek ke MariaDB/MySQL yang sudah ada (staging 10.10.3.62 / production) sesuai apps/api/.env.
+# Browser hanya bicara dengan web; API cukup di jaringan internal Docker.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: sinobisnis-api:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4000"
+      TZ: Asia/Jakarta
+      # Alamat publik web (CORS), mis. https://sinobisnis.contoh.com
+      WEB_ORIGIN: ${PUBLIC_URL:-http://localhost:3001}
+    volumes:
+      # Konfigurasi & rahasia dibaca dotenv dari file di server, tidak masuk image.
+      - ./apps/api/.env:/app/apps/api/.env:ro
+      # Dirujuk DB_ENV_FILE=../../.env (kredensial DB_* / STAGING_DB_*). Buat file ini walau kosong.
+      - ./.env:/app/.env:ro
+      # Profil database aktif (Developer Menu → Database) tetap tersimpan saat container dibuat ulang.
+      - api-config:/app/apps/api/config
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: sinobisnis-web:latest
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      TZ: Asia/Jakarta
+      API_URL: http://api:4000/api
+      PDF_RENDER_ORIGIN: http://127.0.0.1:3001
+      # 1 = cookie login hanya lewat HTTPS (wajib saat sudah pakai domain + HTTPS). 0 = boleh lewat http:// (uji coba).
+      COOKIE_SECURE: ${COOKIE_SECURE:-1}
+    # Chromium butuh shared memory lebih dari default 64 MB untuk PDF besar.
+    shm_size: 1gb
+    ports:
+      # Default hanya dari mesin server sendiri (di belakang Nginx/Caddy). WEB_BIND=0.0.0.0 untuk dibuka langsung.
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3001}:3001"
+    volumes:
+      # Opsional: salin arial*.ttf / impact.ttf dari C:\Windows\Fonts ke ./docker/fonts agar cetakan persis seperti di Windows.
+      - ./docker/fonts:/usr/share/fonts/truetype/custom:ro
+
+volumes:
+  api-config:

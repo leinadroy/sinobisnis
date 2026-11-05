@@ -21,6 +21,8 @@ type FilterKey = InvoiceFilterKey;
 
 
 const columns: ColumnDef<InvoiceRow, unknown>[] = [
+  { id: "id", accessorKey: "id", meta: { label: "ID" }, enableHiding: false, header: ({ column }) => <SortHeader column={column} title="ID" />,
+    cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original.id}</span> },
   {
     id: "actions", header: "", enableHiding: false, enableSorting: false,
     cell: ({ row }) => (
@@ -79,6 +81,7 @@ export function InvoicesTable({ list, options, canCreate }: { list: InvoiceList;
           <RecordCard
             title={<Link href={`/invoices/${r.id}`} className="text-primary hover:underline">{r.no || `#${r.id}`}</Link>}
             fields={[
+              ["ID", String(r.id)],
               ["Status", <span key="s" className="inline-flex gap-1"><InvoiceStatusBadge status={r.status} />{r.requestStatus && <RequestStatusBadge status={r.requestStatus} />}</span>],
               ["Date", fmtDate(r.date)],
               ["Billed To", r.billToName],

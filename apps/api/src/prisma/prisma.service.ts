@@ -79,7 +79,12 @@ export class PrismaService implements OnModuleDestroy {
     const probe = clientFor(profile);
     try {
       const run = async () => {
-        const [info] = await probe.$queryRaw<{ v: string; d: string | null; ro: number | bigint }[]>`SELECT VERSION() AS v, DATABASE() AS d, @@SESSION.tx_read_only AS ro`;
+        const [base] = await probe.$queryRaw<{ v: string; d: string | null }[]>`SELECT VERSION() AS v, DATABASE() AS d`;
+        // MariaDB 10.4: tx_read_only; MySQL 8: transaction_read_only (tx_read_only sudah dihapus).
+        const [ro] = /mariadb/i.test(base.v)
+          ? await probe.$queryRaw<{ ro: number | bigint }[]>`SELECT @@SESSION.tx_read_only AS ro`
+          : await probe.$queryRaw<{ ro: number | bigint }[]>`SELECT @@SESSION.transaction_read_only AS ro`;
+        const info = { ...base, ro: ro.ro };
         const tables = await probe.$queryRaw<{ t: string }[]>`SELECT TABLE_NAME AS t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()`;
         const have = new Set(tables.map((r) => r.t.toLowerCase()));
         const missing = EXPECTED_TABLES.filter((t) => !have.has(t));
