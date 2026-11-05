@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 
 const KEYS = ["sponsorId", "keperluanId", "from", "to", "expiring", "uninvoiced", "unpaid"] as const;
 type Key = (typeof KEYS)[number];
@@ -43,17 +43,11 @@ export function ClientFilters({ options }: { options: MasterOptions }) {
     >
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Sponsor</Label>
-        <Select items={sponsorItems} value={v.sponsorId} onValueChange={(x) => set("sponsorId", x ?? "")}>
-          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-          <SelectContent>{sponsorItems.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-        </Select>
+        <SearchSelect items={sponsorItems} value={v.sponsorId} onValueChange={(x) => set("sponsorId", x ?? "")} className="w-full" />
       </div>
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Keperluan</Label>
-        <Select items={kepItems} value={v.keperluanId} onValueChange={(x) => set("keperluanId", x ?? "")}>
-          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-          <SelectContent>{kepItems.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-        </Select>
+        <SearchSelect items={kepItems} value={v.keperluanId} onValueChange={(x) => set("keperluanId", x ?? "")} className="w-full" />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">

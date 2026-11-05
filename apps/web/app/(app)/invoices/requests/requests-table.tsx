@@ -8,7 +8,7 @@ import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { REQUEST_STATUSES, type Paginated, type UpdateRequestRow } from "@sml/shared";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { DataTable } from "@/components/data-table/data-table";
 import { RecordCard } from "@/components/data-table/record-card";
 import { fmtDate } from "@/lib/format";
@@ -60,15 +60,12 @@ export function RequestsTable({ list, status, canDecide, username }: { list: Pag
       pageSize={list.pageSize}
       searchPlaceholder="Cari no invoice, user…"
       toolbar={
-        <Select items={items} value={status} onValueChange={(v) => {
+        <SearchSelect items={items} value={status} onValueChange={(v) => {
           const next = new URLSearchParams(params.toString());
           next.set("status", v ?? "ALL");
           next.set("page", "1");
           start(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
-        }}>
-          <SelectTrigger className="w-44" aria-label="Status" disabled={pending}><SelectValue /></SelectTrigger>
-          <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-        </Select>
+        }} className="w-44" aria-label="Status" disabled={pending} />
       }
       renderCard={(r) => (
         <RecordCard

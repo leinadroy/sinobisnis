@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fmtDate } from "@/lib/format";
 import { createInvoice } from "../actions";
@@ -24,10 +24,7 @@ function Pick({ id, label, items, value, onChange, placeholder }: {
   return (
     <div className="space-y-1">
       <Label htmlFor={id} className="text-xs text-muted-foreground">{label}</Label>
-      <Select items={items} value={value} onValueChange={(v) => onChange(v ?? "")}>
-        <SelectTrigger id={id} className="w-full"><SelectValue placeholder={placeholder} /></SelectTrigger>
-        <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-      </Select>
+      <SearchSelect items={items} value={value} onValueChange={(v) => onChange(v ?? "")} id={id} className="w-full" placeholder={placeholder} />
     </div>
   );
 }

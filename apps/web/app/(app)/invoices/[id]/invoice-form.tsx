@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { fmtMoney } from "@/lib/format";
@@ -131,10 +131,7 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
     return (
       <Field>
         <FieldLabel htmlFor={id}>{label}{opts.required && <span className="text-destructive">*</span>}</FieldLabel>
-        <Select items={all} value={h[id]} onValueChange={(v) => onChange(v ?? "")}>
-          <SelectTrigger id={id} className="w-full"><SelectValue placeholder="== Please Select ==" /></SelectTrigger>
-          <SelectContent>{all.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-        </Select>
+        <SearchSelect items={all} value={h[id]} onValueChange={(v) => onChange(v ?? "")} id={id} className="w-full" placeholder="== Please Select ==" />
       </Field>
     );
   };
@@ -281,10 +278,7 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
               const items = [{ value: "", label: "Other (isi manual)" }, ...options.taxes.map((m) => ({ value: String(m.id), label: `${m.name} (${m.type === "REDUCTION" ? "−" : "+"}${m.percentage}%)` }))];
               return (
                 <div key={t.key} className="grid grid-cols-2 gap-2 md:grid-cols-[14rem_minmax(0,1fr)_10rem_2rem] md:items-center">
-                  <Select items={items} value={t.taxId} onValueChange={(v) => setTax(t.key, { taxId: v ?? "" })}>
-                    <SelectTrigger className="col-span-2 w-full md:col-span-1" aria-label="Tax"><SelectValue /></SelectTrigger>
-                    <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SearchSelect items={items} value={t.taxId} onValueChange={(v) => setTax(t.key, { taxId: v ?? "" })} className="col-span-2 w-full md:col-span-1" aria-label="Tax" />
                   <Input aria-label="Description" placeholder={master?.name ?? "Keterangan"} value={t.description} onChange={(e) => setTax(t.key, { description: e.target.value })} />
                   {master ? (
                     <span className="self-center text-right text-sm tabular-nums" title="Dihitung dari persentase">{fmtMoney(totals.taxValues[ti])}</span>

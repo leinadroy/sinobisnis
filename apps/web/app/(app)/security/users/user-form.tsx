@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { createUser, updateUser } from "./actions";
 import { userSchema, type UserValues } from "./schema";
 
@@ -63,14 +63,7 @@ export function UserForm({ id, initial, roles, canEdit }: Props) {
               <Field data-invalid={!!errors.roleId}>
                 <FieldLabel htmlFor="roleId">Role</FieldLabel>
                 <Controller control={form.control} name="roleId" render={({ field }) => (
-                  <Select items={roleItems} value={field.value || null} onValueChange={(v) => field.onChange(v ?? "")}>
-                    <SelectTrigger id="roleId" className="w-full" aria-invalid={!!errors.roleId}>
-                      <SelectValue placeholder="Pilih role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roleItems.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchSelect items={roleItems} value={field.value || null} onValueChange={(v) => field.onChange(v ?? "")} id="roleId" className="w-full" aria-invalid={!!errors.roleId} placeholder="Pilih role" />
                 )} />
                 <FieldError errors={[errors.roleId]} />
               </Field>

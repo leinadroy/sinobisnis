@@ -10,7 +10,7 @@ import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRi
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export interface DataTableProps<T> {
@@ -167,10 +167,7 @@ function MobileSort<T>({ columns, sort, onChange }: {
   const items = [{ value: "", label: "Urutan default" }, ...columns.map((c) => ({ value: c.id, label: label(c) }))];
   return (
     <div className="flex items-center gap-2">
-      <Select items={items} value={sort?.id ?? ""} onValueChange={(v) => onChange(v || null, sort?.desc ?? false)}>
-        <SelectTrigger className="flex-1" aria-label="Urutkan"><SelectValue /></SelectTrigger>
-        <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-      </Select>
+      <SearchSelect items={items} value={sort?.id ?? ""} onValueChange={(v) => onChange(v || null, sort?.desc ?? false)} className="flex-1" aria-label="Urutkan" />
       <Button variant="outline" size="icon" disabled={!sort} aria-label={sort?.desc ? "Urut naik" : "Urut turun"}
         onClick={() => sort && onChange(sort.id, !sort.desc)}>
         {sort?.desc ? <ArrowDown /> : <ArrowUp />}
