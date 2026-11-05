@@ -13,7 +13,7 @@ File:
 | File | Isi |
 |---|---|
 | `docker-compose.yml` | dua service, volume `api-config` (profil database aktif), port web |
-| `apps/api/Dockerfile`, `apps/web/Dockerfile` | build dari root repo (`packages/shared` ikut di-build) |
+| `Dockerfile.api`, `Dockerfile.web` (root repo) | build dari root repo (`packages/shared` ikut di-build) |
 | `.dockerignore` | `.env`, data pribadi, `node_modules`, app Python tidak masuk image |
 | `docker/.env.example` | variabel compose (`PUBLIC_URL`, `COOKIE_SECURE`, `WEB_BIND`, `WEB_PORT`) |
 | `docker/fonts/` | opsional: font Arial/Impact dari Windows untuk PDF yang persis sama |

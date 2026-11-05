@@ -7,7 +7,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: Dockerfile.api
     image: sinobisnis-api:latest
     restart: unless-stopped
     environment:
@@ -28,7 +28,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
+      dockerfile: Dockerfile.web
     image: sinobisnis-web:latest
     restart: unless-stopped
     depends_on:
