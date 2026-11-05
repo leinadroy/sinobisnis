@@ -49,3 +49,8 @@ Config.toml
 
 # Catatan akses pribadi (berisi password)
 sml_apps.txt
+
+# Font Windows untuk container web (lisensi Microsoft, tidak di-commit)
+docker/fonts/*.ttf
+docker/fonts/*.TTF
+docker/fonts/*.otf
