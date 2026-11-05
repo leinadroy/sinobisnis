@@ -5,3 +5,6 @@
 
 # Lampiran upload (data pribadi: paspor dll.)
 storage/
+
+# Profil database aktif & log pindah database (Developer Menu → Database)
+/config/

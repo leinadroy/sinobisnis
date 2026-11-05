@@ -7,11 +7,11 @@ import { getAccess } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { AccessMatrix } from "./access-matrix";
 
-export const metadata: Metadata = { title: "Hak Akses Role" };
+export const metadata: Metadata = { title: "Role Pgmname" };
 
 export default async function RoleAccessPage({ searchParams }: PageProps<"/security/role-access">) {
   const { view, edit } = await getAccess("role-access");
-  if (!view) return <><PageHeader title="Hak Akses Role" /><Forbidden /></>;
+  if (!view) return <><PageHeader title="Role Pgmname" /><Forbidden /></>;
   const roles = await apiFetch<{ id: number; name: string }[]>("/roles/options");
   const sp = await searchParams;
   const selected = roles.find((r) => String(r.id) === sp.role) ?? roles[0];
@@ -20,7 +20,7 @@ export default async function RoleAccessPage({ searchParams }: PageProps<"/secur
   return (
     <div>
       <PageHeader
-        title="Hak Akses Role"
+        title="Role Pgmname"
         description="Centang menu yang boleh dilihat dan diubah (Insert/Update/Delete/Save) oleh tiap role. Home, Profile, Password, dan Logout selalu tersedia."
       />
       <div className="mb-4 flex gap-1 overflow-x-auto border-b">

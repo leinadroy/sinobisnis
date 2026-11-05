@@ -52,7 +52,7 @@ export function RolesTable({ list, canEdit, canAccess }: { list: Paginated<RoleR
       if (!editing) return;
       const res = await saveRole(editing.id, editing.name);
       if (!res.ok) return void toast.error(res.error);
-      toast.success(editing.id ? "Role diperbarui." : "Role dibuat. Atur hak aksesnya di menu Hak Akses Role.");
+      toast.success(editing.id ? "Role diperbarui." : "Role dibuat. Atur hak aksesnya di Developer Menu → Role Pgmname.");
       setEditing(null);
     });
 

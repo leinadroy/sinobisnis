@@ -38,7 +38,7 @@ export class AuthService {
   }
 
   private findActiveUser(where: { id: number } | { username: string }) {
-    return this.prisma.user.findFirst({
+    return this.prisma.authDb.user.findFirst({
       where: { ...where, isActive: true },
       include: { role: { include: { programs: true } } },
     });
@@ -50,8 +50,8 @@ export class AuthService {
     if (!u || !(await verifyPassword(u, password))) {
       throw new UnauthorizedException('Username atau password salah.');
     }
-    await this.prisma.user.update({ where: { id: u.id }, data: { lastLogin: new Date() } });
-    const payload: JwtPayload = { sub: u.id };
+    await this.prisma.authDb.user.update({ where: { id: u.id }, data: { lastLogin: new Date() } });
+    const payload: JwtPayload = { sub: u.id, db: this.prisma.activeProfile.key };
     const accessToken = await this.jwt.signAsync(payload);
     const { exp } = this.jwt.decode(accessToken) as { exp: number };
     return { accessToken, expiresIn: exp - Math.floor(Date.now() / 1000), user: this.toSessionUser(u) };
@@ -65,18 +65,21 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Sesi login tidak valid atau sudah kedaluwarsa.');
     }
+    if (payload.db !== this.prisma.activeProfile.key) {
+      throw new UnauthorizedException('Database aplikasi sudah diganti. Silakan login ulang.');
+    }
     const u = await this.findActiveUser({ id: payload.sub });
     if (!u) throw new UnauthorizedException('User tidak aktif.');
     return { ...this.toSessionUser(u), ...this.accessFor(u) };
   }
 
   async changePassword(userId: number, current: string, next: string) {
-    const u = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const u = await this.prisma.authDb.user.findUniqueOrThrow({ where: { id: userId } });
     if (!(await verifyPassword(u, current))) throw new BadRequestException('Password lama salah.');
-    await this.prisma.user.update({ where: { id: userId }, data: await hashPassword(next) });
+    await this.prisma.authDb.user.update({ where: { id: userId }, data: await hashPassword(next) });
   }
 
   async updateProfile(userId: number, data: { fullname: string; email?: string | null }) {
-    await this.prisma.user.update({ where: { id: userId }, data: { fullname: data.fullname.trim(), email: data.email?.trim() || '' } });
+    await this.prisma.authDb.user.update({ where: { id: userId }, data: { fullname: data.fullname.trim(), email: data.email?.trim() || '' } });
   }
 }

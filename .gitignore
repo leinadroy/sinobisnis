@@ -46,3 +46,6 @@ target/
 generated/
 Dependencies.toml
 Config.toml
+
+# Catatan akses pribadi (berisi password)
+sml_apps.txt

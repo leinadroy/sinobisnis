@@ -1,10 +1,11 @@
 "use client";
 
+import type { DbActive } from "@sml/shared";
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Code, House, Mail, Menu as MenuIcon, Shield, Table2, UserRound, type LucideIcon } from "lucide-react";
+import { ChevronRight, Code, Database, House, Mail, Menu as MenuIcon, Shield, Table2, UserRound, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -71,7 +72,26 @@ function Nav({ nav, onNavigate }: { nav: NavEntry[]; onNavigate?: () => void }) 
   );
 }
 
-export function AppShell({ nav, user, children }: { nav: NavEntry[]; user: { fullname: string; roleName: string | null }; children: React.ReactNode }) {
+const DB_BADGE: Record<DbActive["tone"], string> = {
+  local: "border-green-300 bg-green-50 text-green-800",
+  staging: "border-amber-300 bg-amber-50 text-amber-900",
+  production: "border-red-400 bg-red-600 text-white",
+};
+
+/** Label database aktif di header, supaya selalu jelas data mana yang sedang diubah. */
+function DbBadge({ db, link }: { db: DbActive; link: boolean }) {
+  const text = (
+    <span className={`inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs font-semibold uppercase tracking-wide ${DB_BADGE[db.tone]}`}
+      title={`Database: ${db.label}${db.host ? ` — ${db.host}/${db.database ?? ""}` : ""}`}>
+      <Database className="size-3.5" /> {db.label}{db.readOnly && <span className="font-normal normal-case">· hanya baca</span>}
+    </span>
+  );
+  return link ? <Link href="/developer/database" aria-label={`Database aktif: ${db.label}`}>{text}</Link> : text;
+}
+
+export function AppShell({ nav, user, database, showDbLink, children }: {
+  nav: NavEntry[]; user: { fullname: string; roleName: string | null }; database: DbActive; showDbLink: boolean; children: React.ReactNode;
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
     <div className="flex min-h-svh flex-col">
@@ -80,10 +100,16 @@ export function AppShell({ nav, user, children }: { nav: NavEntry[]; user: { ful
           <MenuIcon className="size-5" />
         </Button>
         <Link href="/" className="shrink-0"><Image src="/logo.svg" alt="Sinobisnis Mitra Lestari" width={220} height={44} className="h-8 w-auto md:h-10" priority /></Link>
-        <div className="ml-auto hidden text-sm text-muted-foreground sm:block">
+        <div className="ml-auto"><DbBadge db={database} link={showDbLink} /></div>
+        <div className="hidden text-sm text-muted-foreground sm:block">
           {user.fullname} <span className="text-xs">({user.roleName ?? "tanpa role"})</span>
         </div>
       </header>
+      {database.readOnly && (
+        <div className="border-b border-blue-200 bg-blue-50 px-3 py-1.5 text-center text-xs text-blue-900 md:text-sm">
+          Mode hanya baca — data dari database <b>{database.label}</b>. Perubahan tidak akan disimpan.
+        </div>
+      )}
       <div className="flex flex-1">
         <aside className="sticky top-16 hidden h-[calc(100svh-4rem)] w-64 shrink-0 overflow-y-auto border-r bg-muted/30 md:block">
           <Nav nav={nav} />

@@ -49,8 +49,43 @@ Standar: [`docs/tech-stack.md`](../../docs/tech-stack.md).
 |---|---|
 | `DATABASE_URL` | Koneksi MariaDB (`mysql://…`; adapter memakai `mariadb://`) |
 | `JWT_SECRET`, `JWT_EXPIRES_IN` | Penandatanganan token login (default 12h) |
-| `PORT`, `WEB_ORIGIN` | Port API (4000) & origin web untuk CORS |
+| `PORT`, `HOST`, `WEB_ORIGIN` | Port API (4000); `HOST=127.0.0.1` di server supaya API hanya bisa diakses lokal; origin web untuk CORS |
 | `REMINDER_SCHEDULER` | `off` = matikan penjadwal reminder di instance ini (pakai bila API dijalankan lebih dari satu) |
+
+## Profil database (Developer Menu → Database)
+
+Aplikasi bisa dipindah ke database lain saat berjalan, tanpa mengubah kode. Isi koneksi **hanya** di `.env` server;
+halaman web hanya memilih profil (khusus role Developer, tidak masuk matriks hak akses).
+
+| Variabel | Keterangan |
+|---|---|
+| `DB_PROFILES` | Daftar profil, mis. `local,staging,production`. Kosong = satu profil dari `DATABASE_URL` |
+| `DB_URL_<PROFIL>` | URL koneksi; boleh `${DATABASE_URL}` supaya password tidak ditulis ulang. Kosong = "belum dikonfigurasi" |
+| `DB_DATABASE_<PROFIL>` | Ganti nama database di URL (server & user sama) |
+| `DB_LABEL_<PROFIL>`, `DB_TONE_<PROFIL>` | Nama tampilan; warna `local` (hijau) / `staging` (kuning) / `production` (merah, default dari nama profil) |
+| `DB_MENU_SYNC_<PROFIL>` | `1`/`0`: tambah menuitem 38–42 otomatis (default 1, production / hanya-baca 0) |
+| `DB_READONLY_<PROFIL>` | `1` = hanya baca (default untuk production): sesi MariaDB `READ ONLY` + `max_statement_time`, API menolak semua request selain GET, reminder & sinkron menu mati |
+| `DB_AUTH_<PROFIL>` | Profil hanya-baca: login, password & hak akses dibaca dari profil tulis ini (default `DB_PROFILE_DEFAULT`), karena password di database hanya-baca tidak bisa diatur |
+| `DB_ENV_FILE` | File .env tambahan yang hanya dipakai untuk `${...}` (mis. `../../.env` root berisi `DB_HOST/DB_USER/DB_PASS/DB_NAME` production); `${VAR:url}` = di-encode untuk URL |
+| `DB_PROFILE_DEFAULT`, `DB_PROFILE_FILE` | Profil awal; file penyimpan pilihan (default `config/db-profile.json`, git-ignored, + `db-switch.log`) |
+
+- Pindah = tes koneksi + cek 30 tabel aplikasi dulu; bila gagal database tidak berubah. Profil production wajib
+  konfirmasi ketik nama profilnya. Setelah pindah: token login lama ditolak (JWT membawa nama profil, semua user login
+  ulang), jadwal reminder dibaca ulang, menuitem disinkron (bila diizinkan), dan dicatat di `datalog` (TableName
+  `Database`) database tujuan.
+- Label database aktif selalu tampil di header untuk semua user.
+- Prisma CLI dan script (`npm run user:password`) tetap memakai `DATABASE_URL`, bukan profil aktif.
+- **Production hanya baca** (sekarang): `DB_URL_PRODUCTION=mysql://${DB_USER:url}:${DB_PASS:url}@${DB_HOST}:${DB_PORT}/${DB_NAME}`
+  dengan `DB_ENV_FILE=../../.env`, `DB_READONLY_PRODUCTION=1`, `DB_AUTH_PRODUCTION=local`. Butuh VPN. Tombol simpan di web
+  memberi pesan "dibuka khusus baca"; header menampilkan pita biru "Mode hanya baca". Endpoint yang tetap boleh: login,
+  ganti password/profil (ditulis ke database login), tes & pindah database (`@AllowOnReadOnly()`).
+- Saat go-live (aplikasi lama dimatikan): pakai user database khusus (bukan `gxmysql`), set `DB_READONLY_PRODUCTION=0`, atur
+  password user di production, dan putuskan `Reminder Enabled`.
+
+## Deploy
+
+Windows Server (IIS + NSSM, dua fase: uji coba production hanya-baca → go-live): [`docs/deploy-windows.md`](../../docs/deploy-windows.md),
+skrip di `scripts/deploy/` (`install-services.ps1`, `update.ps1`, `iis/web.config`).
 
 ## Struktur
 
@@ -122,7 +157,7 @@ Semua di bawah prefix `/api`. Dokumentasi lengkap & coba langsung: `/api/docs` (
 ## Konvensi data GeneXus
 
 - Tanggal kosong = `1000-01-01` (kolom NOT NULL), teks kosong = `''`, id `0` = tidak ada. API mengubahnya ke `null`.
-- Baris placeholder "== Please Select ==" (company 0, bill to 267) disembunyikan dari pilihan.
+- Baris placeholder "== Please Select ==" (company 0, bill to 0) disembunyikan dari pilihan.
 - `client.ClientNo` dan `invoice.InvoiceId` BigInt → dikirim sebagai number. Collation `utf8_general_ci` sudah
   tidak peka huruf besar/kecil, jadi pencarian tidak memakai `mode: 'insensitive'`.
 - Client ↔ invoice hanya lewat teks `ClientNoInvoice`. `invoices.no` tidak unik (ada nomor ganda lama).
@@ -148,7 +183,16 @@ Semua di bawah prefix `/api`. Dokumentasi lengkap & coba langsung: `/api/docs` (
   Izin edit hanya untuk satu kali simpan (APPROVED → DONE).
 - **Kontrak**: `kontrak` (tanggal, Bill To, nomor) + `kontrakdetail` (Keperluan, durasi, harga), satu harga per
   Keperluan. `priceList(billTo, date)` = harga dari kontrak terbaru dengan tanggal ≤ date.
-- **Cetak**: halaman web `/print/invoices/:id` memakai `GET /invoices/:id/print`.
+- **Cetak**: halaman web `/print/invoices/:id` memakai `GET /invoices/:id/print`. Model cetakan dipilih dari awalan
+  nomor invoice: `…/RTS/…` → RTS (PT Raqinna Triniti Sentosa), `…/JCSS/…` → JCSS (PT Jassa Ceppat Sukses), lainnya SML
+  (`invoicePrintModel` di `packages/shared`; layout di `apps/web/app/print/invoices/[id]/layouts.tsx`, sama dengan
+  `apps/invoice-printer`).
+- **PDF** (`apps/web/app/bff/invoices/[id]/pdf`): halaman cetak dirender Chrome/Edge headless (`puppeteer-core`) dengan
+  sesi user. `?attachments=1` = invoice + semua lampiran dalam satu PDF ber-bookmark: PDF disalin per halaman, JPG/PNG
+  dijadikan halaman A4, file lain / kosong / rusak dicantumkan di halaman "Tidak digabung". Urutan lampiran mengikuti
+  urutan client di baris invoice (seperti aplikasi lama), lampiran tanpa client di akhir. Server web butuh Chrome atau
+  Edge: dicari otomatis di lokasi standar Windows/Linux, atau isi `PDF_BROWSER_PATH`; `PDF_RENDER_ORIGIN` (default
+  `http://localhost:$PORT`) = alamat web dari sisi server.
 
 ## Aturan bisnis Email Reminder
 

@@ -74,6 +74,17 @@ export interface InvoiceAttachmentRow {
   size: number | null;
   /** Tabel invoiceattachment lama tidak menyimpan waktu unggah. */
   uploadedAt: string | null;
+  /** Client pemilik lampiran (lampiran rujukan dari data client); null = diunggah langsung ke invoice. */
+  clientName: string | null;
+}
+
+/** Model cetakan invoice menurut awalan nomor (…/SML/…, …/RTS/…, …/JCSS/…); lainnya SML. */
+export type InvoicePrintModel = 'SML' | 'RTS' | 'JCSS';
+export function invoicePrintModel(no: string | null | undefined): InvoicePrintModel {
+  const parts = (no ?? '').toUpperCase().split('/').map((p) => p.trim());
+  if (parts.includes('RTS')) return 'RTS';
+  if (parts.includes('JCSS')) return 'JCSS';
+  return 'SML';
 }
 
 export interface UpdateRequestRow {

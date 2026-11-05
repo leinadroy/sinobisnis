@@ -149,17 +149,30 @@ export class InvoicesService {
     return rowsToGroups(rows, (no) => nameOf.get(no), candidates.map((c) => ({ no: Number(c.no), name: c.name })));
   }
 
+  /**
+   * Lampiran invoice, diurutkan seperti cetakan gabungan aplikasi lama: menurut urutan client di baris invoice
+   * (InvoiceDetailClientNo), lalu id. Lampiran upload langsung ke invoice (tanpa client) di akhir.
+   */
   private async attachments(invoiceId: number): Promise<InvoiceAttachmentRow[]> {
     // Ukuran dihitung di database supaya blob tidak ikut terbaca. Lampiran rujukan memakai blob tabel attachment.
-    const rows = await this.prisma.$queryRaw<{ id: bigint; name: string | null; size: bigint | number | null; ref: bigint | null; refName: string | null; refSize: bigint | number | null }[]>`
-      SELECT ia.InvoiceAttachmentId AS id, ia.InvoiceAttachmentName AS name, LENGTH(ia.InvoiceAttachmentBlob) AS size,
-             ia.InvoiceAttachmentIdInvoice AS ref, a.AttachmentName AS refName, LENGTH(a.AttachmentBlob) AS refSize
-      FROM invoiceattachment ia LEFT JOIN attachment a ON a.AttachmentId = ia.InvoiceAttachmentIdInvoice
-      WHERE ia.InvoiceAttachmentInvoiceId = ${invoiceId} ORDER BY ia.InvoiceAttachmentId`;
-    return rows.map((r) => {
+    const [rows, details] = await Promise.all([
+      this.prisma.$queryRaw<{ id: bigint; name: string | null; size: bigint | number | null; ref: bigint | null; refName: string | null; refSize: bigint | number | null; clientNo: bigint | null; clientName: string | null }[]>`
+        SELECT ia.InvoiceAttachmentId AS id, ia.InvoiceAttachmentName AS name, LENGTH(ia.InvoiceAttachmentBlob) AS size,
+               ia.InvoiceAttachmentIdInvoice AS ref, a.AttachmentName AS refName, LENGTH(a.AttachmentBlob) AS refSize,
+               a.AttachmentClientNo AS clientNo, c.ClientName AS clientName
+        FROM invoiceattachment ia
+        LEFT JOIN attachment a ON a.AttachmentId = ia.InvoiceAttachmentIdInvoice
+        LEFT JOIN client c ON c.ClientNo = a.AttachmentClientNo
+        WHERE ia.InvoiceAttachmentInvoiceId = ${invoiceId} ORDER BY ia.InvoiceAttachmentId`,
+      this.prisma.invoiceDetail.findMany({ where: { invoiceId, clientNo: { gt: 0 } }, select: { clientNo: true }, orderBy: { id: 'asc' } }),
+    ]);
+    const order = new Map<string, number>();
+    for (const d of details) if (!order.has(String(d.clientNo))) order.set(String(d.clientNo), order.size + 1);
+    const pos = (clientNo: bigint | null) => (clientNo ? order.get(String(clientNo)) ?? 999 : 1000);
+    return [...rows].sort((a, b) => pos(a.clientNo) - pos(b.clientNo) || Number(a.id) - Number(b.id)).map((r) => {
       const name = r.ref ? attachmentName(r.refName, Number(r.ref)) : attachmentName(r.name, Number(r.id)).replace(/^lampiran-/, 'lampiran-invoice-');
       const size = Number(r.ref ? r.refSize ?? 0 : r.size ?? 0);
-      return { id: Number(r.id), originalName: name, mime: mimeOf(name), size: size || null, uploadedAt: null };
+      return { id: Number(r.id), originalName: name, mime: mimeOf(name), size: size || null, uploadedAt: null, clientName: r.clientName?.trim() || null };
     });
   }
 
