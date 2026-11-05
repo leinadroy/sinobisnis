@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { Textarea } from "@/components/ui/textarea";
 import { saveMaster } from "./actions";
 
@@ -81,10 +81,7 @@ export function MasterForm({ entity, id, initial, options, canEdit }: {
                           <Controller control={form.control} name={f.name} render={({ field }) => {
                             const items = f.type === "ref" ? [{ value: "", label: "— kosong —" }, ...refItems(f)] : (f.options ?? []).map((o) => ({ value: o, label: o }));
                             return (
-                              <Select items={items} value={String(field.value ?? "")} onValueChange={(v) => field.onChange(v ?? "")}>
-                                <SelectTrigger id={f.name} className="w-full" aria-invalid={!!err}><SelectValue placeholder="== Please Select ==" /></SelectTrigger>
-                                <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-                              </Select>
+                              <SearchSelect items={items} value={String(field.value ?? "")} onValueChange={(v) => field.onChange(v ?? "")} id={f.name} className="w-full" aria-invalid={!!err} placeholder="== Please Select ==" />
                             );
                           }} />
                         ) : (

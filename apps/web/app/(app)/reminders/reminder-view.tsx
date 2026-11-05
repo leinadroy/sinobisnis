@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table/data-table";
 import { RecordCard } from "@/components/data-table/record-card";
@@ -209,15 +209,12 @@ export function ReminderLogTable({ list }: { list: ReminderLogList }) {
       searchPlaceholder="Cari Keperluan, user, error…"
       toolbar={
         <>
-        <Select items={items} value={params.get("status") ?? ""} onValueChange={(v) => {
+        <SearchSelect items={items} value={params.get("status") ?? ""} onValueChange={(v) => {
           const next = new URLSearchParams(params.toString());
           if (v) next.set("status", v); else next.delete("status");
           next.set("page", "1");
           start(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
-        }}>
-          <SelectTrigger className="w-40" aria-label="Status" disabled={pending}><SelectValue /></SelectTrigger>
-          <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-        </Select>
+        }} className="w-40" aria-label="Status" disabled={pending} />
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input type="checkbox" className="size-4 accent-primary" checked={params.get("empty") === "1"} disabled={pending} onChange={(e) => {
             const next = new URLSearchParams(params.toString());

@@ -9,7 +9,7 @@ import { INVOICE_STATUSES, type InvoiceList, type InvoiceRow, type MasterOptions
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { DataTable } from "@/components/data-table/data-table";
 import { RecordCard } from "@/components/data-table/record-card";
 import { SortHeader } from "@/components/data-table/column-header";
@@ -130,10 +130,7 @@ function InvoiceFilters({ options }: { options: MasterOptions }) {
   const select = (k: FilterKey, label: string, items: { value: string; label: string }[]) => (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Select items={items} value={v[k]} onValueChange={(x) => set(k, x ?? "")}>
-        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-        <SelectContent>{items.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-      </Select>
+      <SearchSelect items={items} value={v[k]} onValueChange={(x) => set(k, x ?? "")} className="w-full" />
     </div>
   );
   return (

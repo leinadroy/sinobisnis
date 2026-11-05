@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { deleteKontrak, saveKontrak } from "./actions";
 
@@ -68,10 +68,7 @@ export function KontrakForm({ id, options, canEdit, initial }: Props) {
               </Field>
               <Field>
                 <FieldLabel htmlFor="k-billto">Bill To<span className="text-destructive">*</span></FieldLabel>
-                <Select items={billTos} value={billToId} onValueChange={(v) => setBillToId(v ?? "")}>
-                  <SelectTrigger id="k-billto" className="w-full"><SelectValue placeholder="== Please Select ==" /></SelectTrigger>
-                  <SelectContent>{billTos.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <SearchSelect items={billTos} value={billToId} onValueChange={(v) => setBillToId(v ?? "")} id="k-billto" className="w-full" placeholder="== Please Select ==" />
               </Field>
               <Field>
                 <FieldLabel htmlFor="k-nomor">Nomor Kontrak</FieldLabel>
@@ -92,10 +89,7 @@ export function KontrakForm({ id, options, canEdit, initial }: Props) {
             </div>
             {items.map((i) => (
               <div key={i.key} className="grid grid-cols-2 gap-2 rounded-md border p-2 md:grid-cols-[minmax(0,1fr)_10rem_10rem_2rem] md:items-center md:rounded-none md:border-0 md:p-0">
-                <Select items={kepItems} value={i.keperluanId} onValueChange={(v) => setItem(i.key, { keperluanId: v ?? "" })}>
-                  <SelectTrigger className="col-span-2 w-full md:col-span-1" aria-label="Keperluan"><SelectValue placeholder="== Pilih Keperluan ==" /></SelectTrigger>
-                  <SelectContent>{kepItems.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <SearchSelect items={kepItems} value={i.keperluanId} onValueChange={(v) => setItem(i.key, { keperluanId: v ?? "" })} className="col-span-2 w-full md:col-span-1" aria-label="Keperluan" placeholder="== Pilih Keperluan ==" />
                 <Input aria-label="Duration" maxLength={100} value={i.duration} onChange={(e) => setItem(i.key, { duration: e.target.value })} placeholder="mis. 12 bulan" />
                 <Input aria-label="Price" inputMode="decimal" value={i.price} onChange={(e) => setItem(i.key, { price: e.target.value })} />
                 {canEdit ? (

@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { deleteClient, saveClient } from "./actions";
@@ -70,10 +70,7 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
       <Controller control={form.control} name={name} render={({ field }) => {
         const all = [{ value: "", label: "— kosong —" }, ...items];
         return (
-          <Select items={all} value={String(field.value ?? "")} onValueChange={(v) => field.onChange(v ?? "")}>
-            <SelectTrigger id={name} className="w-full"><SelectValue placeholder={placeholder} /></SelectTrigger>
-            <SelectContent>{all.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-          </Select>
+          <SearchSelect items={all} value={String(field.value ?? "")} onValueChange={(v) => field.onChange(v ?? "")} id={name} className="w-full" placeholder={placeholder} />
         );
       }} />
     </Field>
