@@ -16,7 +16,7 @@ export async function setConfig(key: string, value: string) {
 }
 
 export async function createConfig(key: string, value: string) {
-  const res = await runAction(() => apiFetch<SystemConfigRow>("/system-config", { method: "POST", json: { key: key.trim().toUpperCase(), value } }));
+  const res = await runAction(() => apiFetch<SystemConfigRow>("/system-config", { method: "POST", json: { key: key.trim(), value } }));
   if (res.ok) refresh();
   return res;
 }

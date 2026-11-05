@@ -8,4 +8,6 @@ export interface AuthUser extends SessionUser {
 
 export interface JwtPayload {
   sub: number;
+  /** Profil database saat login; token dari database lain ditolak (login ulang setelah pindah database). */
+  db?: string;
 }

@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   // cacheComponents/partial prefetching dimatikan agar pembacaan sesi tidak perlu dibungkus Suspense di tiap halaman.
   cacheComponents: false,
   transpilePackages: ["@sml/shared"],
+  // Chrome headless untuk PDF invoice (lib/invoice-pdf.ts) dijalankan dari node_modules, tidak di-bundle.
+  serverExternalPackages: ["puppeteer-core"],
   outputFileTracingRoot: monorepoRoot,
   turbopack: {
     root: monorepoRoot,

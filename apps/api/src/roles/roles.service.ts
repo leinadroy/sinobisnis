@@ -16,6 +16,13 @@ export class RolesService implements OnModuleInit {
 
   /** Menu baru (belum ada di aplikasi lama) butuh baris menuitem supaya hak aksesnya bisa disimpan di rolepgmname. */
   async onModuleInit() {
+    this.prisma.onSwitch((p) => (p.menuSync ? this.ensureMenuItems() : undefined));
+    if (this.prisma.activeProfile.menuSync) await this.ensureMenuItems();
+    else this.logger.log(`Sinkron menuitem dimatikan untuk profil ${this.prisma.activeProfile.key}.`);
+  }
+
+  /** Menu baru (NEW_MENU_ITEMS) dibuat di tabel menuitem bila belum ada, supaya hak aksesnya bisa disimpan di rolepgmname. */
+  async ensureMenuItems() {
     const existing = new Set((await this.prisma.menuItem.findMany({ select: { id: true } })).map((m) => m.id));
     const missing = NEW_MENU_ITEMS.filter(([id]) => !existing.has(id));
     for (const [id, caption, fatherId, link] of missing) {

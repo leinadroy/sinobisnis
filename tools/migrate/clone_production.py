@@ -137,6 +137,9 @@ def copy_data(meta):
     with conn.cursor() as cur:
         cur.execute("SET FOREIGN_KEY_CHECKS = 0")
         cur.execute("SET UNIQUE_CHECKS = 0")
+        # Baris placeholder ber-id 0 (mis. billto 0 "== Please Select ==") harus tetap 0; tanpa mode ini kolom
+        # AUTO_INCREMENT mengganti 0 dengan id berikutnya (dulu jadi billto 267, 145 invoice kehilangan rujukannya).
+        cur.execute("SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_AUTO_VALUE_ON_ZERO')")
         for t, m in meta.items():
             if t in SKIP_DATA:
                 print(f"  {t:22s} (struktur saja)")

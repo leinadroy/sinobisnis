@@ -28,6 +28,10 @@ export interface SessionUser {
 export interface MeResponse {
   user: SessionUser;
   access: AccessMap;
+  /** Role Developer: akses penuh + menu khusus developer (mis. Database). */
+  isSuperRole: boolean;
+  /** Database yang sedang dipakai aplikasi (label di header). */
+  database: import('./database.js').DbActive;
 }
 
 export interface LoginResponse {

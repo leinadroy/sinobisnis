@@ -7,6 +7,8 @@ export interface MenuLeaf {
   href: string;
   icon?: string;
   always?: boolean;
+  /** Hanya untuk role Developer; tidak masuk matriks hak akses. */
+  superOnly?: boolean;
   /**
    * Baris menuitem di database (hak akses role disimpan di rolepgmname per MenuItemId).
    * Id ≥ 38 belum ada di aplikasi lama dan dibuat otomatis oleh API (lihat NEW_MENU_ITEMS).
@@ -24,6 +26,8 @@ export type MenuEntry = MenuLeaf | MenuGroup;
 
 export const isGroup = (m: MenuEntry): m is MenuGroup => 'children' in m;
 
+// Susunan sama dengan menu production https://smlgroupid.com/sinobisnis (dicek 2026-11-04). Developer Menu production
+// berisi halaman tabel bawaan GeneXus; di sini hanya halaman yang ada di aplikasi baru, dengan urutan yang sama.
 export const MENU: MenuEntry[] = [
   { key: 'home', menuItemId: 2, label: 'Home', icon: 'home', href: '/', always: true },
   {
@@ -41,20 +45,17 @@ export const MENU: MenuEntry[] = [
       { key: 'sponsors', menuItemId: 22, label: 'Sponsor', href: '/master/sponsors' },
       { key: 'sponsor-projects', menuItemId: 29, label: 'Sponsor Project', href: '/master/sponsor-projects' },
       { key: 'bill-to', menuItemId: 26, label: 'Bill To', href: '/master/bill-to' },
-      { key: 'taxes', menuItemId: 38, label: 'Tax', href: '/master/taxes' },
       { key: 'clients.log', menuItemId: 30, label: 'Data Client Log', href: '/clients/log' },
       { key: 'invoices.requests', menuItemId: 31, label: 'Update Request', href: '/invoices/requests' },
       { key: 'kontrak', menuItemId: 33, label: 'Kontrak', href: '/kontrak' },
     ],
   },
-  { key: 'reminders', menuItemId: 40, label: 'Email Reminder', icon: 'mail', href: '/reminders' },
   {
     label: 'Security',
     icon: 'shield',
     children: [
       { key: 'users', menuItemId: 9, label: 'Users', href: '/security/users' },
       { key: 'roles', menuItemId: 23, label: 'Role', href: '/security/roles' },
-      { key: 'role-access', menuItemId: 39, label: 'Hak Akses Role', href: '/security/role-access' },
     ],
   },
   {
@@ -71,8 +72,14 @@ export const MENU: MenuEntry[] = [
     icon: 'code',
     children: [
       { key: 'email-templates', menuItemId: 14, label: 'Email Template', href: '/master/email-templates' },
+      { key: 'role-access', menuItemId: 39, label: 'Role Pgmname', href: '/security/role-access' },
       { key: 'email-recipients', menuItemId: 41, label: 'Email Recipient', href: '/master/email-recipients' },
+      { key: 'taxes', menuItemId: 38, label: 'Tax', href: '/master/taxes' },
       { key: 'system-config', menuItemId: 42, label: 'System Configurator', href: '/developer/system-config' },
+      // Tidak ada di menu production (di sana reminder hanya berjalan terjadwal); halaman pantau & kirim manual.
+      { key: 'reminders', menuItemId: 40, label: 'Email Reminder', href: '/reminders' },
+      // Pilih profil koneksi database (isi koneksi di .env server); hanya role Developer.
+      { key: 'database', label: 'Database', href: '/developer/database', superOnly: true },
     ],
   },
 ];
@@ -95,7 +102,7 @@ export const MENU_ITEMS: MatrixItem[] = MENU.flatMap((m) =>
 );
 
 /** Menu yang diatur lewat matriks hak akses (tanpa item `always`). */
-export const MATRIX_ITEMS: MatrixItem[] = MENU_ITEMS.filter((i) => !i.always);
+export const MATRIX_ITEMS: MatrixItem[] = MENU_ITEMS.filter((i) => !i.always && !i.superOnly);
 export const MATRIX_KEYS: string[] = MATRIX_ITEMS.map((i) => i.key);
 export type MenuKey = string;
 

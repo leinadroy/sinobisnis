@@ -128,6 +128,7 @@ export class RemindersService {
    * "Success" hari ini dilewati kecuali `force`. Setiap kiriman dicatat di datalog (TableName 'Reminder').
    */
   async run(force = false, by: ReminderRunner = SYSTEM_RUNNER): Promise<ReminderRunResult[]> {
+    if (this.prisma.activeProfile.readOnly) throw new ConflictException(`Database ${this.prisma.activeProfile.label} hanya baca: reminder tidak dikirim.`);
     if (this.running) throw new ConflictException('Reminder sedang dikirim. Tunggu sampai selesai.');
     this.running = true;
     try {

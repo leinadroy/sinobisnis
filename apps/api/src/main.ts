@@ -19,7 +19,10 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, () => SwaggerModule.createDocument(app, doc));
 
   const port = Number(process.env.PORT ?? 4000);
-  await app.listen(port);
-  console.log(`API berjalan di http://localhost:${port}/api (Swagger: /api/docs)`);
+  // HOST=127.0.0.1 di server: API hanya bisa diakses dari mesin itu sendiri (browser selalu lewat web/BFF).
+  const host = process.env.HOST?.trim() || undefined;
+  if (host) await app.listen(port, host);
+  else await app.listen(port);
+  console.log(`API berjalan di http://${host ?? 'localhost'}:${port}/api (Swagger: /api/docs)`);
 }
 await bootstrap();

@@ -15,7 +15,7 @@ export function Forbidden() {
   return (
     <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-sm">
       <p className="font-medium text-destructive">Akses ditolak</p>
-      <p className="mt-1 text-muted-foreground">Role Anda tidak memiliki akses ke menu ini. Hubungi administrator untuk mengatur Hak Akses Role.</p>
+      <p className="mt-1 text-muted-foreground">Role Anda tidak memiliki akses ke menu ini. Hubungi administrator untuk mengatur hak akses (Developer Menu → Role Pgmname).</p>
     </div>
   );
 }

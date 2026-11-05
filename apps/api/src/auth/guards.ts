@@ -1,7 +1,8 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { canEdit, canView } from '@sml/shared';
-import { IS_PUBLIC, MENU_ACCESS, type MenuAccessMeta } from '../common/decorators.js';
+import { ALLOW_ON_READ_ONLY, IS_PUBLIC, MENU_ACCESS, type MenuAccessMeta } from '../common/decorators.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthService } from './auth.service.js';
 import type { AuthUser } from './auth.types.js';
 
@@ -19,6 +20,23 @@ export class JwtAuthGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Belum login.');
     req.user = await this.auth.resolveToken(token);
     return true;
+  }
+}
+
+/**
+ * Guard global: saat database aktif hanya-baca (mis. production), semua request selain GET/HEAD ditolak,
+ * kecuali yang ditandai @AllowOnReadOnly(). Lapis kedua: sesi MariaDB READ ONLY (lihat prisma/adapter.ts).
+ */
+@Injectable()
+export class ReadOnlyGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector, private readonly prisma: PrismaService) {}
+
+  canActivate(ctx: ExecutionContext): boolean {
+    if (!this.prisma.activeProfile.readOnly) return true;
+    const req = ctx.switchToHttp().getRequest();
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return true;
+    if (this.reflector.getAllAndOverride<boolean>(ALLOW_ON_READ_ONLY, [ctx.getHandler(), ctx.getClass()])) return true;
+    throw new ForbiddenException(`Database ${this.prisma.activeProfile.label} dibuka khusus baca. Perubahan tidak bisa disimpan.`);
   }
 }
 

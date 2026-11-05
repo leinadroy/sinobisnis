@@ -16,7 +16,7 @@ export default async function RolesPage({ searchParams }: PageProps<"/security/r
   const list = await apiFetch<Paginated<RoleRow>>(`/roles?${qs}`);
   return (
     <div>
-      <PageHeader title="Role" description="Kelompok hak akses user. Menu yang boleh dilihat/diubah diatur di Hak Akses Role." />
+      <PageHeader title="Role" description="Kelompok hak akses user. Menu yang boleh dilihat/diubah diatur di Developer Menu → Role Pgmname." />
       <Suspense>
         <RolesTable list={list} canEdit={edit} canAccess={canView(me.access, "role-access")} />
       </Suspense>

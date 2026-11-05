@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { Cron } from 'croner';
 import type { ReminderSchedule } from '@sml/shared';
 import { RemindersService } from './reminders.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Setiap hari 07:00 WIB = 00:00 UTC, jam jalan aplikasi lama. */
 const DEFAULT_CRON = '0 7 * * *';
@@ -18,7 +19,10 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
   private job: Cron | null = null;
   private state: ReminderSchedule = { enabled: false, cron: DEFAULT_CRON, timezone: DEFAULT_TZ, nextRun: null, error: null };
 
-  constructor(private readonly reminders: RemindersService) {}
+  constructor(private readonly reminders: RemindersService, private readonly prisma: PrismaService) {
+    // Jadwal & konfigurasi reminder dibaca ulang dari database baru setelah pindah database.
+    prisma.onSwitch(() => this.reload());
+  }
 
   async onModuleInit() {
     await this.reload().catch((e) => this.logger.error(`Gagal memuat jadwal: ${e instanceof Error ? e.message : e}`));
@@ -36,7 +40,9 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
     const timezone = cfg['Reminder Timezone']?.trim() || DEFAULT_TZ;
     const enabled = cfg['Reminder Enabled']?.trim() === '1';
     let error: string | null = null;
-    if (process.env.REMINDER_SCHEDULER === 'off') {
+    if (this.prisma.activeProfile.readOnly) {
+      error = `Database ${this.prisma.activeProfile.label} hanya baca: reminder otomatis tidak dijalankan.`;
+    } else if (process.env.REMINDER_SCHEDULER === 'off') {
       error = 'Penjadwal dimatikan di server (REMINDER_SCHEDULER=off).';
     } else if (enabled) {
       try {

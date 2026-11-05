@@ -15,7 +15,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <Image src="/logo.svg" alt="Sinobisnis Mitra Lestari" width={300} height={60} priority className="h-auto w-full" />
         </CardHeader>
         <CardContent>
-          <LoginForm next={next} expired={sp.expired === "1"} />
+          {sp.db === "switched" && (
+            <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">Database aplikasi sudah diganti. Silakan login ulang.</p>
+          )}
+          <LoginForm next={next} expired={sp.expired === "1" && sp.db !== "switched"} />
         </CardContent>
       </Card>
     </main>

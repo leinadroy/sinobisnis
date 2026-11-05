@@ -3,7 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
-import { JwtAuthGuard, MenuAccessGuard } from './guards.js';
+import { JwtAuthGuard, MenuAccessGuard, ReadOnlyGuard } from './guards.js';
 
 @Module({
   imports: [
@@ -20,6 +20,7 @@ import { JwtAuthGuard, MenuAccessGuard } from './guards.js';
     // Urutan penting: JWT dulu (mengisi req.user), lalu hak akses menu.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: MenuAccessGuard },
+    { provide: APP_GUARD, useClass: ReadOnlyGuard },
   ],
   exports: [AuthService],
 })
