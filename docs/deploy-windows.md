@@ -16,6 +16,18 @@ Deploy dilakukan dalam dua fase:
   `apps/api/README.md`). Aplikasi lama tetap dipakai seperti biasa.
 - **Fase B — go-live:** aplikasi lama dimatikan, aplikasi baru menulis ke production.
 
+**Cara cepat (Fase A):** setelah software di langkah 1 terpasang dan user `sinobisnis_ro` dibuat (langkah 2), jalankan
+`scripts\deploy\setup-server.ps1` sebagai Administrator. Script mengerjakan langkah 3–9: ambil kode, membuat kedua `.env`
+(password ditanya, `JWT_SECRET` baru), menyalin production ke MariaDB lokal, build, service NSSM, site IIS, dan firewall.
+Default `-Domain http://10.10.3.61` untuk uji coba tanpa HTTPS (memakai `scripts\deploy\iis-http` dan `COOKIE_SECURE=0`).
+Script boleh dijalankan ulang; `.env` yang sudah ada tidak ditimpa.
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup-server.ps1                                   # http://10.10.3.61
+.\setup-server.ps1 -Domain https://sinobisnis.x.com  # dengan domain; binding https diatur manual
+```
+
 ---
 
 ## 1. Software di server
