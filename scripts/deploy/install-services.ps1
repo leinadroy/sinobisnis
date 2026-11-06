@@ -47,9 +47,13 @@ Install-SmlService -Name "SinobisnisAPI" -Dir (Join-Path $root "apps\api") -AppA
   -EnvVars @("NODE_ENV=production", "HOST=127.0.0.1", "PORT=$ApiPort", "WEB_ORIGIN=$Domain", "TZ=Asia/Jakarta") `
   -Log (Join-Path $logs "api.log")
 
+$webEnv = @("NODE_ENV=production", "PORT=$WebPort", "API_URL=http://127.0.0.1:$ApiPort/api", "PDF_RENDER_ORIGIN=http://127.0.0.1:$WebPort", "TZ=Asia/Jakarta")
+# Uji coba tanpa HTTPS: cookie login harus boleh lewat http, kalau tidak login selalu gagal.
+if ($Domain -like "http://*") { $webEnv += "COOKIE_SECURE=0" }
+
 Install-SmlService -Name "SinobisnisWeb" -Dir (Join-Path $root "apps\web") `
   -AppArgs @("node_modules\next\dist\bin\next", "start", "-p", "$WebPort", "-H", "127.0.0.1") `
-  -EnvVars @("NODE_ENV=production", "PORT=$WebPort", "API_URL=http://127.0.0.1:$ApiPort/api", "PDF_RENDER_ORIGIN=http://127.0.0.1:$WebPort", "TZ=Asia/Jakarta") `
+  -EnvVars $webEnv `
   -Log (Join-Path $logs "web.log") -DependsOn "SinobisnisAPI"
 
 Start-Sleep -Seconds 8
