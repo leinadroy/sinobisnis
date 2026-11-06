@@ -19,6 +19,7 @@ if (-not $SkipPull) { Run "git pull" { git pull --ff-only } }
 $now = (git rev-parse HEAD).Trim()
 Write-Host "Versi: $($prev.Substring(0,7)) -> $($now.Substring(0,7))"
 
+$env:npm_config_legacy_peer_deps = "true"   # lockfile dibuat dengan setelan ini
 nssm stop SinobisnisWeb | Out-Null
 nssm stop SinobisnisAPI | Out-Null
 try {
