@@ -14,8 +14,9 @@ export async function generateMetadata({ params }: PageProps<"/clients/[id]">): 
   return { title: `Client #${(await params).id}` };
 }
 
-export default async function ClientDetailPage({ params }: PageProps<"/clients/[id]">) {
+export default async function ClientDetailPage({ params, searchParams }: PageProps<"/clients/[id]">) {
   const { id } = await params;
+  const updating = (await searchParams).mode === "update";
   if (!/^\d+$/.test(id)) notFound();
   const { view, edit } = await getAccess("clients");
   if (!view) return <><PageHeader title="Client" /><Forbidden /></>;
@@ -26,12 +27,12 @@ export default async function ClientDetailPage({ params }: PageProps<"/clients/[
   return (
     <div>
       <PageHeader
-        title={`Client Form — #${client.id}`}
+        title={updating && edit ? `Client Form — Update #${client.id}` : `Client Detail — #${client.id}`}
         description={[client.name, client.keperluanName, client.sponsorName].filter(Boolean).join(" · ")}
         actions={client.isArchived ? <Badge variant="destructive">Archived</Badge> : undefined}
       />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <ClientForm key={client.updatedAt} id={client.id} initial={toFormValues(client)} options={options} canEdit={edit} invoiceId={client.invoiceId} />
+        <ClientForm key={client.updatedAt} id={client.id} initial={toFormValues(client)} options={options} canEdit={edit} invoiceId={client.invoiceId} mode={updating && edit ? "update" : "view"} />
         <div className="space-y-4">
           <AttachmentsPanel clientId={client.id} attachments={client.attachments} canEdit={edit} />
           <ConversationPanel clientId={client.id} conversations={client.conversations} history={client.history} />

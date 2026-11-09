@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquareText, Paperclip } from "lucide-react";
+import { MessageSquareText, Paperclip, Pencil } from "lucide-react";
 import { daysUntil, type ClientRow } from "@sml/shared";
 import { cn } from "@/lib/utils";
 import { fmtDate } from "@/lib/format";
@@ -27,7 +27,7 @@ function Item({ label, children }: { label: string; children: React.ReactNode })
 }
 
 /** Kartu satu client untuk tampilan HP (pengganti baris tabel yang harus di-scroll ke samping). */
-export function ClientCard({ row: r, archived }: { row: ClientRow; archived?: boolean }) {
+export function ClientCard({ row: r, archived, canEdit }: { row: ClientRow; archived?: boolean; canEdit?: boolean }) {
   const tone = expiryTone(r);
   return (
     <article className={cn("rounded-lg border border-l-4 bg-card p-3 text-sm shadow-xs", tone.card)}>
@@ -41,6 +41,9 @@ export function ClientCard({ row: r, archived }: { row: ClientRow; archived?: bo
         <div className="flex shrink-0 items-center gap-1 text-muted-foreground">
           {r.attachmentCount > 0 && (
             <span className="inline-flex items-center gap-0.5 text-xs" title={`${r.attachmentCount} lampiran`}><Paperclip className="size-3.5" />{r.attachmentCount}</span>
+          )}
+          {canEdit && (
+            <Link href={`/clients/${r.id}?mode=update`} aria-label="Update" title="Update" className="rounded-md p-1.5 hover:bg-muted"><Pencil className="size-4" /></Link>
           )}
           <Link href={`/clients/${r.id}#conversation`} aria-label="Conversation" className="rounded-md p-1.5 hover:bg-muted"><MessageSquareText className="size-4" /></Link>
         </div>
