@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { Pencil } from "lucide-react";
 import { computeExpired, type MasterOptions } from "@sml/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +19,14 @@ import { ConfirmDelete } from "@/components/confirm-delete";
 import { deleteClient, saveClient } from "./actions";
 import { clientSchema, type ClientFormValues } from "./schema";
 
-type Props = { id?: number; initial: ClientFormValues; options: MasterOptions; canEdit: boolean; invoiceId?: number | null };
+/** mode "view" = Client Detail (hanya baca, tombol Update); "update" = form edit client yang sudah ada. */
+type Props = { id?: number; initial: ClientFormValues; options: MasterOptions; canEdit: boolean; invoiceId?: number | null; mode?: "view" | "update" };
 
 const STATUS_OPTIONS = ["Proses", "Selesai", "Pending Dokumen", "Ditolak", "Batal"];
 
-export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) {
+export function ClientForm({ id, initial, options, canEdit, invoiceId, mode = "update" }: Props) {
   const isNew = id === undefined;
+  const viewing = !isNew && (mode === "view" || !canEdit);
   const router = useRouter();
   const [pending, start] = useTransition();
   const form = useForm<ClientFormValues>({ resolver: zodResolver(clientSchema), defaultValues: initial });
@@ -60,7 +63,7 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
         autoMode.current = true;
         router.refresh();
       } else if (isNew) router.push(`/clients/${res.data!.id}`);
-      else router.refresh();
+      else router.push(`/clients/${id}`);
     }),
   );
 
@@ -88,7 +91,7 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-4">
-      <fieldset disabled={!canEdit || pending} className="space-y-4">
+      <fieldset disabled={viewing || pending} className="space-y-4">
         <Card>
           <CardHeader><CardTitle>Data Permohonan</CardTitle></CardHeader>
           <CardContent>
@@ -166,17 +169,21 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
       </fieldset>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t bg-background py-3">
-        {canEdit && (
+        {viewing && canEdit && (
+          <Button nativeButton={false} render={<Link href={`/clients/${id}?mode=update`} />}><Pencil /> Update</Button>
+        )}
+        {!viewing && canEdit && (
           <>
-            <Button type="submit" disabled={pending} onClick={() => { nextAction.current = "stay"; }}>{pending ? "Menyimpan…" : "Save"}</Button>
+            <Button type="submit" disabled={pending} onClick={() => { nextAction.current = "stay"; }}>{pending ? "Menyimpan…" : isNew ? "Save" : "Save Update"}</Button>
             {isNew && <Button type="submit" variant="secondary" disabled={pending} onClick={() => { nextAction.current = "new"; }}>Save &amp; New</Button>}
+            {!isNew && <Button variant="outline" disabled={pending} nativeButton={false} render={<Link href={`/clients/${id}`} />}>Batal</Button>}
           </>
         )}
         <Button variant="outline" nativeButton={false} render={<Link href={initial.isArchived ? "/clients/archived" : "/clients"} />}>Back To List</Button>
-        {!isNew && canEdit && (
+        {viewing && canEdit && (
           <Button variant="outline" nativeButton={false} render={<Link href={`/clients/new?copy=${id}`} />}>Permohonan baru untuk client ini</Button>
         )}
-        {!isNew && canEdit && (
+        {viewing && canEdit && (
           <span className="ml-auto">
             <ConfirmDelete title={`Hapus client #${id}?`} description="Data client, lampiran, dan conversation-nya akan dihapus permanen."
               onConfirm={async () => { const r = await deleteClient(id!); if (r.ok) router.push("/clients"); return r; }} />

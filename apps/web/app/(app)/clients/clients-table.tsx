@@ -30,14 +30,14 @@ export function ClientsTable({ list, options, canEdit, archived = false }: {
   return (
     <div className="space-y-2">
       <DataTable
-        columns={clientColumns(archived)}
+        columns={clientColumns(archived, canEdit)}
         data={list.data}
         total={list.total}
         page={list.page}
         pageSize={list.pageSize}
         hiddenColumns={CLIENT_HIDDEN_COLUMNS}
         rowClassName={expiryClass}
-        renderCard={(r) => <ClientCard row={r} archived={archived} />}
+        renderCard={(r) => <ClientCard row={r} archived={archived} canEdit={canEdit} />}
         searchPlaceholder="Filter Full Text (nama, paspor, RPTKA, invoice, sponsor…)"
         filters={showFilters && <ClientFilters options={options} />}
         toolbar={

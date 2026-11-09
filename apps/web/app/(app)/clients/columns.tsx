@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MessageSquareText, Paperclip, Pencil } from "lucide-react";
+import { Eye, MessageSquareText, Paperclip, Pencil } from "lucide-react";
 import { daysUntil, type ClientRow } from "@sml/shared";
 import { Button } from "@/components/ui/button";
 import { SortHeader } from "@/components/data-table/column-header";
@@ -49,7 +49,7 @@ export function expiryClass(r: ClientRow) {
   return undefined;
 }
 
-export function clientColumns(archived: boolean): ColumnDef<ClientRow, unknown>[] {
+export function clientColumns(archived: boolean, canEdit = false): ColumnDef<ClientRow, unknown>[] {
   const cols: ColumnDef<ClientRow, unknown>[] = COLS.map((c) => ({
     id: c.id,
     accessorKey: c.id,
@@ -77,7 +77,10 @@ export function clientColumns(archived: boolean): ColumnDef<ClientRow, unknown>[
     id: "actions", header: "", enableHiding: false, enableSorting: false,
     cell: ({ row }) => (
       <div className="flex items-center gap-0.5">
-        <Button variant="ghost" size="icon-xs" aria-label="Buka" nativeButton={false} render={<Link href={`/clients/${row.original.id}`} />}><Pencil /></Button>
+        <Button variant="ghost" size="icon-xs" aria-label="Detail" title="Client Detail" nativeButton={false} render={<Link href={`/clients/${row.original.id}`} />}><Eye /></Button>
+        {canEdit && (
+          <Button variant="ghost" size="icon-xs" aria-label="Update" title="Update" nativeButton={false} render={<Link href={`/clients/${row.original.id}?mode=update`} />}><Pencil /></Button>
+        )}
         <Button variant="ghost" size="icon-xs" aria-label="Conversation" nativeButton={false} render={<Link href={`/clients/${row.original.id}#conversation`} />}><MessageSquareText /></Button>
         {row.original.attachmentCount > 0 && (
           <span className="inline-flex items-center text-xs text-muted-foreground" title={`${row.original.attachmentCount} lampiran`}>
