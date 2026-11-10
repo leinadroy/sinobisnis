@@ -81,12 +81,27 @@ export interface ClientLogRow {
 
 export interface ClientDetail extends ClientRow {
   pembayaranPnbp: string | null;
+  attachments: ClientAttachmentRow[];
+  conversations: ConversationRow[];
+}
+
+export interface ClientHistoryRow {
+  id: number;
+  historyDate: string;
+  userName: string | null;
+  action: string;
+}
+
+/**
+ * Riwayat perubahan client dari datalog — endpoint terpisah (`GET /clients/:id/history`) karena tabel datalog
+ * tidak punya index pada TableId sehingga query-nya selalu full scan (beberapa detik); form tidak perlu menunggunya.
+ */
+export interface ClientHistory {
   /** Dari log pertama/terakhir (tabel client lama tidak punya kolom waktu). */
   createdAt: string | null;
   updatedAt: string | null;
-  attachments: ClientAttachmentRow[];
-  conversations: ConversationRow[];
-  history: { id: number; historyDate: string; userName: string | null; action: string }[];
+  /** 20 log terbaru. */
+  items: ClientHistoryRow[];
 }
 
 export interface PersonRow {

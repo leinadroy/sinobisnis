@@ -93,6 +93,12 @@ export class ClientsController {
   }
 
   @Menu('clients')
+  @Get(':id/history')
+  history(@Param('id', ParseIntPipe) id: number) {
+    return this.clients.history(id);
+  }
+
+  @Menu('clients')
   @Post()
   create(@Body() dto: CreateClientDto, @CurrentUser() user: AuthUser) {
     return this.clients.create(dto, user.id);

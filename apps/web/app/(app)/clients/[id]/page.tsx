@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ClientDetail, MasterOptions } from "@sml/shared";
@@ -8,6 +9,7 @@ import { getAccess } from "@/lib/session";
 import { AttachmentsPanel } from "../attachments-panel";
 import { ClientForm } from "../client-form";
 import { ConversationPanel } from "../conversation-panel";
+import { HistoryCard, HistoryCardSkeleton } from "../history-card";
 import { toFormValues } from "../form-values";
 
 export async function generateMetadata({ params }: PageProps<"/clients/[id]">): Promise<Metadata> {
@@ -23,6 +25,7 @@ export default async function ClientDetailPage({ params }: PageProps<"/clients/[
     apiFetch<ClientDetail>(`/clients/${id}`).catch((e) => { if (e instanceof ApiError && e.status === 404) notFound(); throw e; }),
     apiFetch<MasterOptions>("/master/options"),
   ]);
+  const initial = toFormValues(client);
   return (
     <div>
       <PageHeader
@@ -31,10 +34,14 @@ export default async function ClientDetailPage({ params }: PageProps<"/clients/[
         actions={client.isArchived ? <Badge variant="destructive">Archived</Badge> : undefined}
       />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <ClientForm key={client.updatedAt} id={client.id} initial={toFormValues(client)} options={options} canEdit={edit} invoiceId={client.invoiceId} />
+        {/* key = isi form: setelah simpan (router.refresh) data baru → form di-mount ulang dengan nilai terbaru. */}
+        <ClientForm key={JSON.stringify(initial)} id={client.id} initial={initial} options={options} canEdit={edit} invoiceId={client.invoiceId} />
         <div className="space-y-4">
           <AttachmentsPanel clientId={client.id} attachments={client.attachments} canEdit={edit} />
-          <ConversationPanel clientId={client.id} conversations={client.conversations} history={client.history} />
+          <ConversationPanel clientId={client.id} conversations={client.conversations} />
+          <Suspense fallback={<HistoryCardSkeleton />}>
+            <HistoryCard clientId={client.id} />
+          </Suspense>
         </div>
       </div>
     </div>
