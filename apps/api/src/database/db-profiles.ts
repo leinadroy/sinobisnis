@@ -15,6 +15,10 @@ import type { DbActive, DbTone } from '@sml/shared';
  *                                               (default 1 untuk production)
  *   DB_AUTH_LOCAL=local                          profil hanya-baca: login & hak akses dibaca dari profil ini
  *                                               (default DB_PROFILE_DEFAULT / profil tulis pertama)
+ *   DB_WRITE_USERS_PRODUCTION=1                  pengecualian profil hanya-baca: tabel `users` boleh ditulis (tambah/edit
+ *                                               user, password, last login) lewat koneksi terpisah yang HANYA mengizinkan
+ *                                               user.create/user.update; login & hak akses dibaca dari profil ini sendiri.
+ *                                               Semua tabel lain tetap READ ONLY. Default 0.
  *   DB_ENV_FILE=../../.env                       file .env tambahan yang hanya dipakai untuk ${...} (mis. DB_PASS
  *                                               production di .env root, tanpa menyalin passwordnya); ${VAR:url} = di-encode
  *   DB_PROFILE_DEFAULT=local                     profil awal bila belum pernah dipilih
@@ -31,6 +35,11 @@ export interface DbProfile {
   menuSync: boolean;
   /** Hanya baca: sesi MariaDB READ ONLY dan API menolak semua perubahan. */
   readOnly: boolean;
+  /**
+   * Profil hanya-baca dengan pengecualian tabel `users` (DB_WRITE_USERS_<PROFIL>=1): login & user dari profil ini sendiri,
+   * ditulis lewat koneksi khusus users (prisma/users-only.ts). Selalu false untuk profil yang bisa ditulis.
+   */
+  usersWritable: boolean;
   /** Profil hanya-baca: profil asal data login/hak akses (null = profil ini sendiri). */
   authKey: string | null;
 }
@@ -80,7 +89,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function loadProfiles(env: NodeJS.ProcessEnv = process.env): DbProfile[] {
   const keys = (env.DB_PROFILES ?? '').split(',').map((k) => k.trim().toLowerCase()).filter(Boolean);
   if (!keys.length) {
-    return [{ key: 'default', label: 'Default (DATABASE_URL)', url: env.DATABASE_URL ?? '', tone: 'local', danger: false, menuSync: true, readOnly: false, authKey: null }];
+    return [{ key: 'default', label: 'Default (DATABASE_URL)', url: env.DATABASE_URL ?? '', tone: 'local', danger: false, menuSync: true, readOnly: false, usersWritable: false, authKey: null }];
   }
   const extra = extraEnv(env);
   const list = [...new Set(keys)].map((key) => {
@@ -99,15 +108,17 @@ export function loadProfiles(env: NodeJS.ProcessEnv = process.env): DbProfile[] 
       danger: tone === 'production' && !readOnly,
       menuSync: readOnly ? false : sync === undefined || sync === '' ? tone !== 'production' : sync === '1',
       readOnly,
+      usersWritable: readOnly && env[`DB_WRITE_USERS_${K}`]?.trim() === '1',
       authKey: null,
     };
     return p;
   });
-  // Profil hanya-baca memakai login/hak akses dari profil tulis (password di database hanya-baca tidak bisa diatur).
+  // Profil hanya-baca memakai login/hak akses dari profil tulis (password di database hanya-baca tidak bisa diatur),
+  // kecuali profil dengan pengecualian tabel users: login dari profil itu sendiri (authKey null).
   const writable = list.filter((p) => !p.readOnly && p.url);
   const fallback = writable.find((p) => p.key === env.DB_PROFILE_DEFAULT?.trim().toLowerCase()) ?? writable[0];
   for (const p of list) {
-    if (!p.readOnly) continue;
+    if (!p.readOnly || p.usersWritable) continue;
     const want = env[`DB_AUTH_${envKey(p.key)}`]?.trim().toLowerCase();
     p.authKey = (writable.find((w) => w.key === want) ?? fallback)?.key ?? null;
   }
@@ -126,7 +137,7 @@ export function describeUrl(url: string): { host: string | null; port: number | 
 
 export const toActive = (p: DbProfile): DbActive => {
   const d = describeUrl(p.url);
-  return { key: p.key, label: p.label, tone: p.tone, host: d.host, database: d.database, readOnly: p.readOnly };
+  return { key: p.key, label: p.label, tone: p.tone, host: d.host, database: d.database, readOnly: p.readOnly, usersWritable: p.usersWritable };
 };
 
 export interface DbState {

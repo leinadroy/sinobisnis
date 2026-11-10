@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, Menu } from '../common/decorators.js';
+import { AllowUsersWrite, CurrentUser, Menu } from '../common/decorators.js';
 import { ListQueryDto } from '../common/list-query.dto.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { CreateUserDto, UpdateUserDto } from './users.dto.js';
@@ -23,12 +23,15 @@ export class UsersController {
     return this.users.get(id);
   }
 
+  // Tambah & edit user boleh di database hanya-baca dengan pengecualian tabel users; hapus tidak (ikut usercookies).
   @Post()
+  @AllowUsersWrite()
   create(@Body() dto: CreateUserDto) {
     return this.users.create(dto);
   }
 
   @Patch(':id')
+  @AllowUsersWrite()
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto, @CurrentUser() me: AuthUser) {
     return this.users.update(id, dto, me.id);
   }

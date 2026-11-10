@@ -11,6 +11,8 @@ export interface DbActive {
   database: string | null;
   /** Hanya baca: semua perubahan ditolak (koneksi MariaDB READ ONLY). */
   readOnly: boolean;
+  /** Pengecualian hanya-baca: tabel users (tambah/edit user, password) boleh ditulis; login dari database ini sendiri. */
+  usersWritable: boolean;
 }
 
 export interface DbProfileRow extends DbActive {
