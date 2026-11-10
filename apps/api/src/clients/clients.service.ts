@@ -383,6 +383,12 @@ export function attachmentName(name: string | null, id: number) {
   return n && n !== '0' ? n : `lampiran-${id}.pdf`;
 }
 
+/** PDF/gambar dibuka langsung di browser (inline); tipe lain diunduh. Hanya tipe hasil mimeOf, jadi aman. */
+export function fileDisposition(mime: string, name: string) {
+  const inline = mime === 'application/pdf' || mime.startsWith('image/');
+  return `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
 export function mimeOf(name: string, data?: Uint8Array) {
   if (data?.length) {
     if (data[0] === 0x25 && data[1] === 0x50) return 'application/pdf';

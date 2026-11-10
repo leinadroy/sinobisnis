@@ -7,6 +7,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Download, Filter, Lock, Pencil, Plus, Printer } from "lucide-react";
 import { INVOICE_STATUSES, type InvoiceList, type InvoiceRow, type MasterOptions } from "@sml/shared";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/ui/search-select";
@@ -141,11 +142,11 @@ function InvoiceFilters({ options }: { options: MasterOptions }) {
       <div className="grid grid-cols-2 gap-2 sm:col-span-2 lg:col-span-2">
         <div className="space-y-1">
           <Label htmlFor="f-from" className="text-xs text-muted-foreground">Invoice date dari</Label>
-          <Input id="f-from" type="date" value={v.from} onChange={(e) => set("from", e.target.value)} />
+          <DateInput id="f-from" value={v.from} onChange={(d) => set("from", d)} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="f-to" className="text-xs text-muted-foreground">sampai</Label>
-          <Input id="f-to" type="date" value={v.to} onChange={(e) => set("to", e.target.value)} />
+          <DateInput id="f-to" value={v.to} onChange={(d) => set("to", d)} />
         </div>
       </div>
       <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-5 lg:justify-end">

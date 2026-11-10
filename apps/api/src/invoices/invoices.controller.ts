@@ -12,6 +12,7 @@ import {
   CreateInvoiceDto, InvoiceableQueryDto, InvoiceListQueryDto, PriceListQueryDto, RequestEditDto, RequestListQueryDto, SaveInvoiceDto,
 } from './invoices.dto.js';
 import { InvoicesService } from './invoices.service.js';
+import { fileDisposition } from '../clients/clients.service.js';
 
 // Lampiran disimpan sebagai blob di tabel invoiceattachment (seperti aplikasi lama), jadi file ditahan di memori.
 const upload = FilesInterceptor('files', 20, { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -96,7 +97,8 @@ export class InvoicesController {
   async download(@Param('aid', ParseIntPipe) aid: number, @Res({ passthrough: true }) res: Response) {
     const a = await this.invoices.attachment(aid);
     res.setHeader('Content-Type', a.mime);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(a.name)}`);
+    res.setHeader('Content-Disposition', fileDisposition(a.mime, a.name));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     return new StreamableFile(a.data);
   }
 

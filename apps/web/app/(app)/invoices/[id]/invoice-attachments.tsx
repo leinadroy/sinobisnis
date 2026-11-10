@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Paperclip, Upload } from "lucide-react";
+import { ExternalLink, Paperclip, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { InvoiceAttachmentRow } from "@sml/shared";
 import { Button } from "@/components/ui/button";
@@ -44,8 +44,8 @@ export function InvoiceAttachments({ invoiceId, attachments, editable }: { invoi
         <ul className="divide-y text-sm">
           {attachments.map((a) => (
             <li key={a.id} className="flex items-center gap-2 py-2">
-              <a href={`/bff/invoices/attachments/${a.id}`} className="flex min-w-0 flex-1 items-center gap-2 text-primary hover:underline">
-                <Download className="size-3.5 shrink-0" /> <span className="truncate">{a.originalName}</span>
+              <a href={`/bff/invoices/attachments/${a.id}`} target="_blank" rel="noopener" title="Buka lampiran" className="flex min-w-0 flex-1 items-center gap-2 text-primary hover:underline">
+                <ExternalLink className="size-3.5 shrink-0" /> <span className="truncate">{a.originalName}</span>
               </a>
               <span className="shrink-0 text-xs text-muted-foreground">{fmtSize(a.size)} · {fmtDateTime(a.uploadedAt)}</span>
               {editable && <ConfirmDelete title={`Hapus lampiran ${a.originalName}?`} onConfirm={() => deleteInvoiceAttachment(invoiceId, a.id)} />}
