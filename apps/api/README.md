@@ -95,7 +95,8 @@ halaman web hanya memilih profil (khusus role Developer, tidak masuk matriks hak
   dengan `DB_ENV_FILE=../../.env`, `DB_READONLY_PRODUCTION=1`, `DB_AUTH_PRODUCTION=local`. Butuh VPN. Tombol simpan di web
   memberi pesan "dibuka khusus baca"; header menampilkan pita biru "Mode hanya baca". Endpoint yang tetap boleh: login,
   ganti password/profil (ditulis ke database login), tes & pindah database (`@AllowOnReadOnly()`).
-- **Pengecualian tabel users** (`DB_WRITE_USERS_PRODUCTION=1`, disetujui user 2026-11-10): login, user & hak akses dibaca dari
+- **Pengecualian tabel users** — opsional, **sekarang mati** (`DB_WRITE_USERS_PRODUCTION=0`: production hanya baca untuk semua tabel).
+  Bila dinyalakan (`DB_WRITE_USERS_PRODUCTION=1`, hanya atas permintaan owner): login, user & hak akses dibaca dari
   production sendiri (bukan `DB_AUTH_PRODUCTION`), dan tabel `users` boleh ditulis — login (LastLogin), ganti password/profil,
   Security → Users tambah/edit (`@AllowUsersWrite()`). Hapus user tetap ditolak (ikut `usercookies`; nonaktifkan saja).
   Penulisan lewat koneksi kedua (`src/prisma/users-only.ts`, sesi tidak READ ONLY, `max_statement_time` 120) yang **hanya**
