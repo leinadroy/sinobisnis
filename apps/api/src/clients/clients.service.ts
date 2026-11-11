@@ -161,12 +161,13 @@ export class ClientsService {
   }
 
   async attachments(clientNo: number): Promise<ClientAttachmentRow[]> {
-    // Ukuran dihitung di database supaya blob tidak ikut terbaca.
-    const rows = await this.prisma.$queryRaw<{ id: bigint; name: string | null; size: bigint | number | null }[]>`
-      SELECT AttachmentId AS id, AttachmentName AS name, LENGTH(AttachmentBlob) AS size FROM attachment WHERE AttachmentClientNo = ${BigInt(clientNo)} ORDER BY AttachmentId`;
+    // Kolom blob tidak disentuh sama sekali: LENGTH(AttachmentBlob) memaksa MariaDB membaca seluruh isi file
+    // (production: 3 lampiran = 100+ detik vs 0,3 detik tanpa). Ukuran file tidak ada kolomnya, jadi tidak ditampilkan.
+    const rows = await this.prisma.$queryRaw<{ id: bigint; name: string | null }[]>`
+      SELECT AttachmentId AS id, AttachmentName AS name FROM attachment WHERE AttachmentClientNo = ${BigInt(clientNo)} ORDER BY AttachmentId`;
     return rows.map((a) => {
       const name = attachmentName(a.name, Number(a.id));
-      return { id: Number(a.id), originalName: name, mime: mimeOf(name), size: a.size === null ? null : Number(a.size), uploadedAt: null };
+      return { id: Number(a.id), originalName: name, mime: mimeOf(name), size: null, uploadedAt: null };
     });
   }
 

@@ -50,7 +50,9 @@ export function AttachmentsPanel({ clientId, attachments, canEdit }: { clientId:
               <a href={`/bff/clients/attachments/${a.id}?download=1`} title="Download" aria-label={`Download ${a.originalName}`} className="shrink-0 text-muted-foreground hover:text-foreground">
                 <Download className="size-3.5" />
               </a>
-              <span className="shrink-0 text-xs text-muted-foreground">{fmtSize(a.size)} · {fmtDateTime(a.uploadedAt)}</span>
+              {(a.size || a.uploadedAt) && (
+                <span className="shrink-0 text-xs text-muted-foreground">{[fmtSize(a.size), fmtDateTime(a.uploadedAt)].filter(Boolean).join(" · ")}</span>
+              )}
               {canEdit && <ConfirmDelete title={`Hapus lampiran ${a.originalName}?`} onConfirm={() => deleteAttachment(clientId, a.id)} />}
             </li>
           ))}
