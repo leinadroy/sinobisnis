@@ -118,6 +118,13 @@ export class PrismaService implements OnModuleDestroy {
       const check = await this.test(profile);
       if (!check.ok) return check;
       const auth = this.__authFor(profile, loadProfiles());
+      // Profil hanya-baca memakai database lain untuk login; pastikan itu juga hidup, kalau tidak semua user tidak bisa login lagi.
+      if (auth) {
+        const authCheck = await this.test(auth.profile);
+        if (!authCheck.ok) {
+          return { ...check, ok: false, error: `Database login (${auth.profile.key}) tidak bisa dipakai: ${authCheck.error ?? 'koneksi gagal'}` };
+        }
+      }
       const next = clientFor(profile);
       await next.$connect();
       const old = [this.__client, this.__auth?.client].filter((c): c is PrismaClient => Boolean(c));

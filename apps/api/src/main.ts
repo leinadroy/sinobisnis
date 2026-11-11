@@ -1,13 +1,15 @@
 import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
+import { DbUnavailableFilter } from './common/db-unavailable.filter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
   app.enableCors({ origin: (process.env.WEB_ORIGIN || 'http://localhost:3001').split(','), credentials: true });
+  app.useGlobalFilters(new DbUnavailableFilter(app.get(HttpAdapterHost).httpAdapter));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
 
   const doc = new DocumentBuilder()
