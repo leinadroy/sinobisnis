@@ -11,7 +11,7 @@ import { CurrentUser, Menu } from '../common/decorators.js';
 import { ListQueryDto } from '../common/list-query.dto.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { ArchiveDto, ClientDto, ClientListQueryDto, ConversationDto, CreateClientDto } from './clients.dto.js';
-import { ClientsService } from './clients.service.js';
+import { ClientsService, fileDisposition } from './clients.service.js';
 
 // Lampiran disimpan sebagai blob di tabel attachment (seperti aplikasi lama), jadi file ditahan di memori.
 const upload = FilesInterceptor('files', 20, { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -72,10 +72,11 @@ export class ClientsController {
 
   @Menu('clients', 'view')
   @Get('attachments/:aid/file')
-  async download(@Param('aid', ParseIntPipe) aid: number, @Res({ passthrough: true }) res: Response) {
+  async download(@Param('aid', ParseIntPipe) aid: number, @Query('download') download: string | undefined, @Res({ passthrough: true }) res: Response) {
     const a = await this.clients.attachment(aid);
     res.setHeader('Content-Type', a.mime);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(a.name)}`);
+    res.setHeader('Content-Disposition', fileDisposition(a.name, a.mime, download === '1'));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     return new StreamableFile(a.data);
   }
 

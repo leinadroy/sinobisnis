@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Textarea } from "@/components/ui/textarea";
@@ -174,13 +175,13 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
               </Field>
               <Field>
                 <FieldLabel htmlFor="date">Invoice Date</FieldLabel>
-                <Input id="date" type="date" value={h.date} onChange={(e) => { setHeader({ date: e.target.value }); loadPrices(h.billToId, e.target.value); }} />
+                <DateInput id="date" value={h.date} onChange={(x) => { setHeader({ date: x }); loadPrices(h.billToId, x); }} />
               </Field>
               {sel("status", "Invoice Status", INVOICE_STATUSES.map((x) => ({ value: x, label: x })),
                 (v) => setHeader({ status: (v || "DRAFT") as InvoiceStatus, ...(v === "PAID" && !h.paidDate ? { paidDate: todayStr() } : {}) }), { empty: false })}
               <Field>
                 <FieldLabel htmlFor="paidDate">Invoice Paid Date</FieldLabel>
-                <Input id="paidDate" type="date" value={h.status === "PAID" ? h.paidDate : ""} disabled={h.status !== "PAID"} onChange={(e) => setHeader({ paidDate: e.target.value })} />
+                <DateInput id="paidDate" value={h.status === "PAID" ? h.paidDate : ""} disabled={h.status !== "PAID"} onChange={(x) => setHeader({ paidDate: x })} />
                 {h.status !== "PAID" && <FieldDescription>Terisi saat status PAID.</FieldDescription>}
               </Field>
               {sel("bankAccountId", "Bank Account", options.bankAccounts.map((b) => ({ value: String(b.id), label: b.label })), (v) => setHeader({ bankAccountId: v }))}

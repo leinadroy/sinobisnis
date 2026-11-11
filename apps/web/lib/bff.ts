@@ -16,7 +16,7 @@ export async function forwardToApi(path: string, init: RequestInit = {}): Promis
   }).catch(() => null);
   if (!res) return Response.json({ message: "API tidak dapat dihubungi." }, { status: 503 });
   const headers = new Headers();
-  for (const h of ["content-type", "content-disposition", "content-length"]) {
+  for (const h of ["content-type", "content-disposition", "content-length", "x-content-type-options"]) {
     const v = res.headers.get(h);
     if (v) headers.set(h, v);
   }

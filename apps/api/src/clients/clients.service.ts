@@ -364,6 +364,14 @@ export function attachmentName(name: string | null, id: number) {
   return n && n !== '0' ? n : `lampiran-${id}.pdf`;
 }
 
+const INLINE_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+
+/** Content-Disposition lampiran: PDF/gambar dibuka langsung di browser (inline), lainnya atau `download` → diunduh. */
+export function fileDisposition(name: string, mime: string, download = false) {
+  const type = !download && INLINE_MIME.has(mime) ? 'inline' : 'attachment';
+  return `${type}; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
 export function mimeOf(name: string, data?: Uint8Array) {
   if (data?.length) {
     if (data[0] === 0x25 && data[1] === 0x50) return 'application/pdf';

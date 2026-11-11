@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,6 +84,15 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
       <FieldError errors={[errors[name] as { message?: string } | undefined]} />
     </Field>
   );
+  const date = (name: keyof ClientFormValues, label: string) => (
+    <Field data-invalid={!!errors[name]}>
+      <FieldLabel htmlFor={name}>{label}</FieldLabel>
+      <Controller control={form.control} name={name} render={({ field }) => (
+        <DateInput id={name} ref={field.ref} name={field.name} onBlur={field.onBlur} value={String(field.value ?? "")} onChange={field.onChange} aria-invalid={!!errors[name]} />
+      )} />
+      <FieldError errors={[errors[name] as { message?: string } | undefined]} />
+    </Field>
+  );
   const grid = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
   const isArchived = useWatch({ control: form.control, name: "isArchived" });
 
@@ -94,15 +104,15 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
           <CardContent>
             <FieldGroup className={grid}>
               <Field><FieldLabel>Client No</FieldLabel><Input value={isNew ? "(otomatis)" : String(id)} readOnly disabled /></Field>
-              {text("tanggalPermohonan", "Tanggal Permohonan", { type: "date" })}
+              {date("tanggalPermohonan", "Tanggal Permohonan")}
               {sel("sponsorId", "Client Sponsor", options.sponsors.map((s) => ({ value: String(s.id), label: s.name })))}
               {sel("projectId", "Client Project", projects.map((p) => ({ value: String(p.id), label: p.name })), sponsorId ? "== Please Select ==" : "Pilih sponsor dulu")}
               {text("name", "Nama Client", { required: true })}
               {text("noPaspor", "No Paspor")}
-              {text("tanggalLahir", "Tanggal Lahir", { type: "date" })}
+              {date("tanggalLahir", "Tanggal Lahir")}
               {sel("keperluanId", "Keperluan", options.keperluan.filter((k) => k.isActive || String(k.id) === initial.keperluanId).map((k) => ({ value: String(k.id), label: k.name })))}
               {text("noRptka", "No RPTKA")}
-              {text("pembayaranPnbp", "Client Pembayaran PNBP", { type: "date" })}
+              {date("pembayaranPnbp", "Client Pembayaran PNBP")}
               {text("permohonanHariKe3", "Permohonan Hari Ke3")}
             </FieldGroup>
           </CardContent>
@@ -112,12 +122,15 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
           <CardHeader><CardTitle>Proses &amp; Dokumen</CardTitle></CardHeader>
           <CardContent>
             <FieldGroup className={grid}>
-              {text("tanggalProsesSelesai", "Tanggal Proses Selesai", { type: "date" })}
-              {text("tanggalTerbitDokumen", "Tanggal Terbit Dokumen", { type: "date" })}
-              {text("tanggalMasukLastExp", "Tanggal Masuk Indo / Last Expired", { type: "date" })}
+              {date("tanggalProsesSelesai", "Tanggal Proses Selesai")}
+              {date("tanggalTerbitDokumen", "Tanggal Terbit Dokumen")}
+              {date("tanggalMasukLastExp", "Tanggal Masuk Indo / Last Expired")}
               <Field data-invalid={!!errors.expiredDokumen}>
                 <FieldLabel htmlFor="expiredDokumen">Expired Dokumen</FieldLabel>
-                <Input id="expiredDokumen" type="date" {...form.register("expiredDokumen", { onChange: (e) => { autoMode.current = !e.target.value; } })} />
+                <Controller control={form.control} name="expiredDokumen" render={({ field }) => (
+                  <DateInput id="expiredDokumen" ref={field.ref} name={field.name} onBlur={field.onBlur} value={String(field.value ?? "")}
+                    onChange={(x) => { autoMode.current = !x; field.onChange(x); }} />
+                )} />
                 <FieldDescription>
                   {keperluan?.periode
                     ? <>Otomatis: {keperluan.sumberData.toLowerCase()} + {keperluan.periode} {keperluan.periodeIn === "DAYS" ? "hari" : "bulan"}. Kosongkan untuk menghitung ulang.</>
@@ -143,8 +156,8 @@ export function ClientForm({ id, initial, options, canEdit, invoiceId }: Props) 
           <CardContent>
             <FieldGroup className={grid}>
               {text("noInvoice", "No Invoice", { description: invoiceId ? "Terhubung ke invoice; diperbarui otomatis dari modul Invoice." : undefined })}
-              {text("tanggalInvoice", "Tanggal Invoice", { type: "date" })}
-              {text("tanggalPembayaranInvoice", "Tanggal Pembayaran Invoice", { type: "date" })}
+              {date("tanggalInvoice", "Tanggal Invoice")}
+              {date("tanggalPembayaranInvoice", "Tanggal Pembayaran Invoice")}
             </FieldGroup>
           </CardContent>
         </Card>
