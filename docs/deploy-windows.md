@@ -28,7 +28,19 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\setup-server.ps1 -Domain https://sinobisnis.x.com  # dengan domain; binding https diatur manual
 ```
 
-**Dipasang di server database production (10.10.3.23)?** Di sana "MariaDB lokal" (127.0.0.1:3306) adalah production
+**Deploy langsung port 3001 (tanpa IIS, sama seperti laptop) — dipakai di 10.10.3.23:** di server itu port 80/443
+sudah dipakai Apache XAMPP, jadi IIS tidak dipasang. `scripts\deploy\setup-direct.ps1` membuka web langsung di
+`http://10.10.3.23:3001` (Next listen `0.0.0.0:3001`, firewall 3001; API tetap `127.0.0.1:4000`) dengan profil yang sama
+seperti laptop setelah go-live 2026-11-12: `staging` (default) + `production` **bisa ditulis**; login dari database
+profil yang aktif. Tanpa salin data, tanpa MariaDB tambahan, tanpa Python. `REMINDER_SCHEDULER=off` tetap dipasang.
+Software yang perlu: Node.js 22, Git, NSSM, Chrome/Edge. Update berikutnya tetap `update.ps1`.
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup-direct.ps1          # http://<ip-server>:3001, kode dari branch main
+```
+
+**Dipasang di server database production (10.10.3.23) dengan Fase A?** Di sana "MariaDB lokal" (127.0.0.1:3306) adalah production
 itu sendiri. Database login Fase A wajib memakai **nama lain**, mis. `sinobisnis_login`, dengan user yang hanya punya hak
 pada database itu:
 

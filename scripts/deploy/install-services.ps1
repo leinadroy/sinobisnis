@@ -3,12 +3,14 @@
   Jalankan sebagai Administrator dari folder root repo, setelah `npm run install:all` dan `npm run build`:
     .\scripts\deploy\install-services.ps1 -Domain "https://sinobisnis.contoh.com"
   Butuh nssm.exe di PATH.
+  -WebHost 0.0.0.0 = web langsung dibuka ke jaringan tanpa IIS (mis. http://10.10.3.23:3001); API tetap 127.0.0.1.
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Domain,
   [string]$Node = "C:\Program Files\nodejs\node.exe",
   [int]$ApiPort = 4000,
-  [int]$WebPort = 3001
+  [int]$WebPort = 3001,
+  [string]$WebHost = "127.0.0.1"
 )
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -52,7 +54,7 @@ $webEnv = @("NODE_ENV=production", "PORT=$WebPort", "API_URL=http://127.0.0.1:$A
 if ($Domain -like "http://*") { $webEnv += "COOKIE_SECURE=0" }
 
 Install-SmlService -Name "SinobisnisWeb" -Dir (Join-Path $root "apps\web") `
-  -AppArgs @("node_modules\next\dist\bin\next", "start", "-p", "$WebPort", "-H", "127.0.0.1") `
+  -AppArgs @("node_modules\next\dist\bin\next", "start", "-p", "$WebPort", "-H", $WebHost) `
   -EnvVars $webEnv `
   -Log (Join-Path $logs "web.log") -DependsOn "SinobisnisAPI"
 
