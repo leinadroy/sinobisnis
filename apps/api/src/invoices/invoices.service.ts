@@ -11,7 +11,7 @@ import { attachmentName, ClientsService, mimeOf } from '../clients/clients.servi
 import { d2s, GX_EMPTY_DATE, s2d } from '../common/dates.js';
 import { paginated } from '../common/list-query.dto.js';
 import { KontrakService } from '../kontrak/kontrak.service.js';
-import { matchBillTo } from '../master/master.service.js';
+import { billToUsage, matchBillTo } from '../master/master.service.js';
 import { groupsToRows, normName, rowsToGroups, type Group } from './invoice-rows.js';
 import type { CreateInvoiceDto, InvoiceableQueryDto, InvoiceListQueryDto, RequestListQueryDto, SaveInvoiceDto } from './invoices.dto.js';
 
@@ -241,8 +241,8 @@ export class InvoicesService {
   /** Client yang bisa di-invoice (belum punya No Invoice, tidak diarsip/dihapus). Maks 500 baris. */
   async invoiceable(q: InvoiceableQueryDto): Promise<InvoiceableClientRow[]> {
     const and: Prisma.ClientWhereInput[] = [INVOICEABLE];
-    const [projects, billTos] = await Promise.all([this.prisma.sponsorProject.findMany(), this.prisma.billTo.findMany()]);
-    const projectBillTo = new Map(projects.map((p) => [p.id, matchBillTo(p, billTos)]));
+    const [projects, billTos, usage] = await Promise.all([this.prisma.sponsorProject.findMany(), this.prisma.billTo.findMany(), billToUsage(this.prisma)]);
+    const projectBillTo = new Map(projects.map((p) => [p.id, matchBillTo(p, billTos, usage)]));
     if (q.sponsorId) and.push({ sponsorId: q.sponsorId });
     if (q.projectId) and.push({ projectId: q.projectId });
     if (q.billToId) and.push({ projectId: { in: projects.filter((p) => projectBillTo.get(p.id) === q.billToId).map((p) => p.id) } });
@@ -267,6 +267,34 @@ export class InvoicesService {
    * Baris company dikunci (SELECT … FOR UPDATE) supaya dua Create Invoice bersamaan tidak mendapat nomor yang sama;
    * bila nomor hasil format sudah dipakai invoice lain, penghitung dinaikkan lagi.
    */
+  /**
+   * Lampiran client ikut ke invoice seperti aplikasi lama: satu baris invoiceattachment per lampiran client, berisi
+   * rujukan InvoiceAttachmentIdInvoice = AttachmentId (blob kosong, nama NULL). Lampiran yang sudah dirujuk tidak
+   * digandakan. `remove`: rujukan ke lampiran client yang dikeluarkan dari invoice dihapus (upload langsung ke invoice tetap).
+   */
+  private async syncClientAttachments(tx: Prisma.TransactionClient, invoiceId: number, add: number[], remove: number[] = []) {
+    if (remove.length) {
+      const gone = await tx.$queryRaw<{ id: bigint }[]>`
+        SELECT AttachmentId AS id FROM attachment WHERE AttachmentClientNo IN (${Prisma.join(remove.map(BigInt))})`;
+      if (gone.length) await tx.invoiceAttachment.deleteMany({ where: { invoiceId, attachmentRefId: { in: gone.map((g) => g.id) } } });
+    }
+    if (!add.length) return;
+    // Tanpa kolom blob: AttachmentClientNo tidak ber-index, jadi ini full scan (lihat ClientsService.attachments).
+    const atts = await tx.$queryRaw<{ id: bigint; clientNo: bigint }[]>`
+      SELECT AttachmentId AS id, AttachmentClientNo AS clientNo FROM attachment
+      WHERE AttachmentClientNo IN (${Prisma.join(add.map(BigInt))}) ORDER BY AttachmentId`;
+    if (!atts.length) return;
+    const have = new Set((await tx.invoiceAttachment.findMany({ where: { invoiceId, attachmentRefId: { not: null } }, select: { attachmentRefId: true } }))
+      .map((r) => String(r.attachmentRefId)));
+    // Urutan client seperti di baris invoice, lalu id lampiran.
+    const pos = new Map(add.map((c, i) => [String(c), i]));
+    const fresh = atts.filter((a) => !have.has(String(a.id)))
+      .sort((a, b) => (pos.get(String(a.clientNo)) ?? 0) - (pos.get(String(b.clientNo)) ?? 0) || Number(a.id) - Number(b.id));
+    if (fresh.length) {
+      await tx.invoiceAttachment.createMany({ data: fresh.map((a) => ({ invoiceId, attachmentRefId: a.id, blob: new Uint8Array(0) })) });
+    }
+  }
+
   private async nextNumber(tx: Prisma.TransactionClient, companyId: number, date: string) {
     await tx.$queryRaw`SELECT CompanyId FROM company WHERE CompanyId = ${companyId} FOR UPDATE`;
     const co = await tx.company.findUniqueOrThrow({ where: { id: companyId } });
@@ -298,7 +326,7 @@ export class InvoicesService {
     if (!billToId) {
       const projectId = clients.find((c) => c.projectId)?.projectId;
       const project = projectId ? await this.prisma.sponsorProject.findUnique({ where: { id: projectId } }) : null;
-      if (project) billToId = matchBillTo(project, await this.prisma.billTo.findMany());
+      if (project) billToId = matchBillTo(project, await this.prisma.billTo.findMany(), await billToUsage(this.prisma));
     }
     const billTo = billToId ? await this.prisma.billTo.findUnique({ where: { id: billToId } }) : null;
     if (billToId && !billTo) throw new BadRequestException('Bill To tidak ditemukan.');
@@ -332,6 +360,7 @@ export class InvoicesService {
       // Syarat "belum ber-invoice" diulang di sini supaya client yang baru saja di-invoice user lain tidak tertimpa.
       const linked = await tx.client.updateMany({ where: { no: { in: ids.map(BigInt) }, ...INVOICEABLE }, data: { noInvoice: no, tanggalInvoice: s2d(date) } });
       if (linked.count !== ids.length) throw new ConflictException('Sebagian client baru saja dimasukkan ke invoice lain. Muat ulang daftar client.');
+      await this.syncClientAttachments(tx, Number(created.id), groups.flatMap((g) => g.clients.map((c) => c.clientId!)));
       return created;
     });
 
@@ -440,6 +469,10 @@ export class InvoicesService {
         const linked = await tx.client.updateMany({ where: { no: { in: added.map(BigInt) }, ...INVOICEABLE }, data: linkData });
         if (linked.count !== added.length) throw new ConflictException('Sebagian client baru saja dimasukkan ke invoice lain. Muat ulang halaman.');
       }
+      // Lampiran ikut client: yang baru masuk invoice ditambahkan, yang dikeluarkan dihapus rujukannya.
+      const inNow = groups.flatMap((g) => g.clients.map((c) => c.clientId).filter((x): x is number => !!x));
+      const dropped = [...members].filter((c) => !unique.has(c));
+      await this.syncClientAttachments(tx, id, inNow.filter((c) => !members.has(c)), dropped);
       // Izin edit hanya berlaku untuk satu kali simpan.
       if (wasApproved) await tx.updateRequest.updateMany({ where: { invoiceId: inv.id, status: 'APPROVED' }, data: { status: 'DONE', updatedDate: s2d(todayStr())! } });
     });
