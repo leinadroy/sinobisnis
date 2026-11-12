@@ -10,6 +10,21 @@ type Row = Record<string, any>;
 
 const norm = (s: string | null | undefined) => (s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
+/**
+ * Opsi dropdown Bill To. Nama yang dipakai lebih dari satu Bill To (mis. dua "Sinohydro Corporation Limited") diberi
+ * pembeda supaya user tidak salah pilih: kode perusahaan / NPWP bila ada, dan selalu nomor id.
+ */
+export function billToOptions(billTos: { id: number; companyName: string; npwp: string; kodePerusahaan: string }[]) {
+  const count = new Map<string, number>();
+  for (const b of billTos) count.set(norm(b.companyName), (count.get(norm(b.companyName)) ?? 0) + 1);
+  return billTos.map((b) => {
+    const extra = (count.get(norm(b.companyName)) ?? 0) > 1
+      ? ` (${[b.kodePerusahaan.trim(), b.npwp.trim() && `NPWP ${b.npwp.trim()}`, `#${b.id}`].filter(Boolean).join(' · ')})`
+      : '';
+    return { id: b.id, label: `${b.companyName}${extra}`, npwp: b.npwp || null };
+  });
+}
+
 /** Pemakaian Bill To per sponsor di invoice: key `${sponsorId}:${billToId}` → nilai urut (makin besar makin baru). */
 export type BillToUsage = Map<string, number>;
 
@@ -168,7 +183,7 @@ export class MasterService {
     ]);
     return {
       sponsors,
-      billTos: billTos.map((b) => ({ id: b.id, label: b.companyName, npwp: b.npwp || null })),
+      billTos: billToOptions(billTos),
       bankAccounts: banks.map((b) => ({ id: b.id, label: `${b.bankName} _ ${b.accountNo}` })),
       projects: projects.map((p) => ({ id: p.id, name: p.name, sponsorId: p.sponsorId, companyName: p.companyName || null, billToId: matchBillTo(p, billTos, usage) })),
       keperluan: keperluan.map((k) => ({

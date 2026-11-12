@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchBillTo } from './master.service.js';
+import { billToOptions, matchBillTo } from './master.service.js';
 
 const bt = (id: number, companyName: string, kodePerusahaan = '', npwp = '') => ({ id, companyName, kodePerusahaan, npwp });
 // Seperti staging: dua Bill To bernama sama, kode SCL juga dipakai dua Bill To.
@@ -27,5 +27,17 @@ describe('matchBillTo', () => {
 
   it('nama tidak terpecahkan → lanjut ke NPWP', () => {
     expect(matchBillTo({ ...pohuwato, npwp: '0020721924053000' }, billTos, new Map())).toBe(10);
+  });
+});
+
+describe('billToOptions', () => {
+  it('nama dobel diberi pembeda, nama unik tidak', () => {
+    const labels = billToOptions(billTos).map((o) => o.label);
+    expect(labels).toEqual([
+      'Sinohydro Corporation Limited (SCL · NPWP 0020721924053000 · #10)',
+      'Sinohydro Corporation Limited (#75)',
+      'Sinohydro PII Nem Consortium',
+      'Sinohydro-Adhi Jo',
+    ]);
   });
 });
