@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { login } from "./actions";
 import { loginSchema, type LoginValues } from "./schema";
 
 export function LoginForm({ next, expired }: { next?: string; expired?: boolean }) {
@@ -18,8 +17,21 @@ export function LoginForm({ next, expired }: { next?: string; expired?: boolean 
   const onSubmit = form.handleSubmit((values) => {
     setError(null);
     startTransition(async () => {
-      const res = await login(values, next);
-      if (res && !res.ok) setError(res.error);
+      try {
+        const response = await fetch("/login/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          setError(result.message || "Login gagal.");
+          return;
+        }
+        window.location.assign(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+      } catch {
+        setError("Server tidak dapat dihubungi. Silakan coba lagi.");
+      }
     });
   });
 
