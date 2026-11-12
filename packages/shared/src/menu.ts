@@ -80,6 +80,8 @@ export const MENU: MenuEntry[] = [
       { key: 'reminders', menuItemId: 40, label: 'Email Reminder', href: '/reminders' },
       // Pilih profil koneksi database (isi koneksi di .env server); hanya role Developer.
       { key: 'database', label: 'Database', href: '/developer/database', superOnly: true },
+      // Uji rumus hash password GeneXus lama pada user sungguhan (hanya baca); hanya role Developer.
+      { key: 'legacy-password', label: 'Tes Password GX', href: '/developer/legacy-password', superOnly: true },
     ],
   },
 ];
