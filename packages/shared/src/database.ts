@@ -55,3 +55,22 @@ export interface DbTestResult {
 }
 
 export const DB_TONE_LABEL: Record<DbTone, string> = { local: 'Lokal', staging: 'Staging', production: 'Production' };
+
+/** Developer Menu → Tes Password GX: hasil uji rumus hash GeneXus untuk satu user (tanpa hash/salt). */
+export interface LegacyPasswordTestResult {
+  userId: number;
+  username: string;
+  isActive: boolean;
+  /** Database tempat user dibaca (profil login aktif). */
+  authDatabase: string;
+  format: 'bcrypt' | 'legacy' | 'unknown';
+  saltLength: number;
+  hashLength: number;
+  /** LEGACY_SYSTEM_SALT terisi di apps/api/.env. */
+  systemSaltConfigured: boolean;
+  /** Hasil rumus GeneXus; null bila user bukan format legacy atau SystemSalt kosong. */
+  legacyMatch: boolean | null;
+  /** Hasil cek bcrypt; null bila user bukan bcrypt. */
+  bcryptMatch: boolean | null;
+  ms: number;
+}
