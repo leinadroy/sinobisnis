@@ -56,7 +56,11 @@ function Nav({ nav, onNavigate }: { nav: NavEntry[]; onNavigate?: () => void }) 
             </button>
             {isOpen && (
               <div className="ml-6 mt-1 flex flex-col border-l pl-2">
-                {e.children.map((c) => (
+                {e.children.map((c) => c.href === "/logout" ? (
+                  <form key={c.href} action="/logout" method="post">
+                    <button type="submit" className="w-full rounded-md px-3 py-2 text-left text-muted-foreground hover:bg-muted">{c.label}</button>
+                  </form>
+                ) : (
                   <Link key={c.href} href={c.href} onClick={onNavigate}
                     className={cn("rounded-md px-3 py-2 text-muted-foreground hover:bg-muted",
                       active === c.href && "bg-primary/10 font-medium text-primary")}>
@@ -100,7 +104,7 @@ export function AppShell({ nav, user, database, showDbLink, children }: {
         <Button variant="ghost" size="icon" className="md:hidden text-orange-600" aria-label="Buka menu" onClick={() => setMobileOpen(true)}>
           <MenuIcon className="size-5" />
         </Button>
-        <Link href="/" className="shrink-0"><Image src="/logo.svg" alt="Sinobisnis Mitra Lestari" width={220} height={44} className="h-8 w-auto md:h-10" priority /></Link>
+        <Link href="/" className="shrink-0"><Image src="/logo-sinobisnis.png" alt="Sinobisnis Mitra Lestari" width={1342} height={267} className="h-8 w-auto object-contain md:h-10" priority /></Link>
         <div className="ml-auto min-w-0"><DbBadge db={database} link={showDbLink} /></div>
         <div className="hidden text-sm text-muted-foreground sm:block">
           {user.fullname} <span className="text-xs">({user.roleName ?? "tanpa role"})</span>

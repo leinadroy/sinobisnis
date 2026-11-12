@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 /** Penanda di users.UsersSalt bahwa UsersHashedPassword berisi hash bcrypt (password diatur lewat aplikasi baru). */
 export const BCRYPT_SALT = 'bcrypt';
@@ -10,11 +11,16 @@ export async function hashPassword(password: string) {
 
 /**
  * Cocokkan password dengan user. Hash bcrypt diperiksa langsung.
- * Hash GeneXus aplikasi lama (UsersSalt 64 hex + UsersHashedPassword 64 hex) belum bisa diverifikasi karena algoritmanya
- * belum diketahui — user lama perlu diberi password baru oleh admin (Security → Users) atau lewat
- * `npm run user:password -- <username>`.
+ * Hash lama dari aplikasi GeneXus. Akun andi cocok dengan password + SystemSalt
+ * (tanpa UsersSalt); terima juga varian dengan UsersSalt dari prosedur lama.
  */
 export async function verifyPassword(user: { salt: string; hashedPassword: string }, password: string) {
   if (user.salt === BCRYPT_SALT) return bcrypt.compare(password, user.hashedPassword);
-  return false;
+  const systemSalt = process.env.SYSTEM_SALT;
+  if (!systemSalt || !/^[a-f\d]{64}$/i.test(user.hashedPassword)) return false;
+  const expected = Buffer.from(user.hashedPassword, 'hex');
+  const digest = (input: string) => createHash('sha256').update(input, 'utf8').digest();
+  const withUserSalt = timingSafeEqual(digest(password + systemSalt + user.salt), expected);
+  const withoutUserSalt = timingSafeEqual(digest(password + systemSalt), expected);
+  return withUserSalt || withoutUserSalt;
 }

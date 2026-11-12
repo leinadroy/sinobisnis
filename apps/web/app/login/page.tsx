@@ -12,7 +12,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     <main className="flex min-h-svh items-start justify-center bg-slate-500/80 px-4 pt-[12vh]">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <Image src="/logo.svg" alt="Sinobisnis Mitra Lestari" width={300} height={60} priority className="h-auto w-full" />
+          <Image src="/logo-sinobisnis.png" alt="Sinobisnis Mitra Lestari" width={1342} height={267} priority className="h-auto w-full object-contain" />
         </CardHeader>
         <CardContent>
           {sp.db === "switched" && (

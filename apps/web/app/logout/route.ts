@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { TOKEN_COOKIE } from "@/lib/api";
 
 export async function GET(request: Request) {
+  return NextResponse.redirect(new URL("/", request.url));
+}
+
+export async function POST(request: Request) {
   (await cookies()).delete(TOKEN_COOKIE);
-  return NextResponse.redirect(new URL("/login", request.url));
+  return NextResponse.redirect(new URL("/login", request.url), 303);
 }
