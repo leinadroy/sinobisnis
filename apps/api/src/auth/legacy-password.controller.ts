@@ -18,7 +18,7 @@ class LegacyPasswordTestDto {
 /**
  * Developer Menu → Tes Password GX: uji rumus hash GeneXus (SHA-256 password + SystemSalt + UsersSalt) pada user sungguhan.
  * Hanya membaca tabel users (database login aktif); tidak mengubah password, tidak mencatat password, tidak mengembalikan hash/salt.
- * Login aplikasi BELUM memakai rumus ini.
+ * Login aplikasi memakai rumus yang sama (password.ts verifyPassword) bila LEGACY_SYSTEM_SALT diisi.
  */
 @ApiTags('auth')
 @ApiBearerAuth()

@@ -10,17 +10,18 @@ export async function hashPassword(password: string) {
 }
 
 /**
- * Cocokkan password dengan user. Hash bcrypt diperiksa langsung.
- * Hash GeneXus aplikasi lama (UsersSalt 64 hex + UsersHashedPassword 64 hex) BELUM dipakai untuk login — rumusnya
- * (verifyLegacyPassword di bawah) sedang diuji lewat Developer Menu → Tes Password GX. Sampai itu terbukti, user lama perlu
- * diberi password baru oleh admin (Security → Users) atau lewat `npm run user:password -- <username>`.
+ * Cocokkan password dengan user (login & ganti password):
+ * - bcrypt (UsersSalt = 'bcrypt'): password yang diatur lewat aplikasi baru;
+ * - hash GeneXus aplikasi lama (UsersSalt + UsersHashedPassword 64 hex) dengan rumus verifyLegacyPassword — hanya bila
+ *   LEGACY_SYSTEM_SALT diisi di apps/api/.env. Hash lama TIDAK diubah ke bcrypt saat login, supaya user tetap bisa login
+ *   di aplikasi GeneXus yang masih dipakai (bcrypt tidak bisa dibaca aplikasi lama).
  */
-export async function verifyPassword(user: { salt: string; hashedPassword: string }, password: string) {
+export async function verifyPassword(user: { salt: string; hashedPassword: string }, password: string, systemSalt = legacySystemSalt()) {
   if (user.salt === BCRYPT_SALT) return bcrypt.compare(password, user.hashedPassword);
-  return false;
+  return verifyLegacyPassword(user, password, systemSalt);
 }
 
-// ---------------------------------------------------------------- Hash GeneXus aplikasi lama (uji coba)
+// ---------------------------------------------------------------- Hash GeneXus aplikasi lama
 
 /** SystemSalt GeneXus (rahasia, satu untuk semua user) dari apps/api/.env — repo ini publik, jangan tulis di kode. */
 export const legacySystemSalt = (env: NodeJS.ProcessEnv = process.env) => env.LEGACY_SYSTEM_SALT?.trim() ?? '';

@@ -12,7 +12,7 @@ export default async function LegacyPasswordPage() {
     <div>
       <PageHeader
         title="Tes Password GX"
-        description="Uji rumus hash password aplikasi GeneXus lama: SHA-256(password + SystemSalt + UsersSalt). User dibaca dari database login yang aktif; tidak ada yang diubah dan password tidak disimpan atau dicatat. Login aplikasi belum memakai rumus ini."
+        description="Uji rumus hash password aplikasi GeneXus lama: SHA-256(password + SystemSalt + UsersSalt). User dibaca dari database login yang aktif; tidak ada yang diubah dan password tidak disimpan atau dicatat. Login aplikasi juga memakai rumus ini bila LEGACY_SYSTEM_SALT diisi di server."
       />
       <LegacyPasswordTester />
     </div>

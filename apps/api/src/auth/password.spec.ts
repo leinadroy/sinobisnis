@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BCRYPT_SALT, legacyHash, legacySystemSalt, passwordFormat, verifyLegacyPassword } from './password.js';
+import { BCRYPT_SALT, hashPassword, legacyHash, legacySystemSalt, passwordFormat, verifyLegacyPassword, verifyPassword } from './password.js';
 
 // Nilai contoh saja — BUKAN SystemSalt asli (itu rahasia, hanya di apps/api/.env).
 // Hash pembanding dihitung terpisah dengan Python hashlib.sha256((pwd + sys + usr).encode('utf-8')).hexdigest().upper().
@@ -43,6 +43,25 @@ describe('verifyLegacyPassword', () => {
 
   it('user bcrypt tidak pernah dicek dengan rumus GeneXus', () => {
     expect(verifyLegacyPassword({ salt: BCRYPT_SALT, hashedPassword: HASH_UNICODE }, 'pässwörd', SYS64)).toBe(false);
+  });
+});
+
+describe('verifyPassword (dipakai login & ganti password)', () => {
+  const legacyUser = { salt: USR64, hashedPassword: HASH_UNICODE };
+
+  it('user GeneXus lama bisa login dengan password lama bila SystemSalt diisi', async () => {
+    expect(await verifyPassword(legacyUser, 'pässwörd', SYS64)).toBe(true);
+    expect(await verifyPassword(legacyUser, 'salah', SYS64)).toBe(false);
+  });
+
+  it('tanpa SystemSalt, user GeneXus lama tidak bisa login', async () => {
+    expect(await verifyPassword(legacyUser, 'pässwörd', '')).toBe(false);
+  });
+
+  it('user bcrypt tetap dicek dengan bcrypt', async () => {
+    const u = await hashPassword('baru-123');
+    expect(await verifyPassword(u, 'baru-123', SYS64)).toBe(true);
+    expect(await verifyPassword(u, 'baru-12', SYS64)).toBe(false);
   });
 });
 
