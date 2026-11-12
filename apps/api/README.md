@@ -80,6 +80,7 @@ halaman web hanya memilih profil (khusus role Developer, tidak masuk matriks hak
 | `DB_MENU_SYNC_<PROFIL>` | `1`/`0`: tambah menuitem 38–42 otomatis (default 1, production / hanya-baca 0) |
 | `DB_READONLY_<PROFIL>` | `1` = hanya baca (default untuk production): sesi MariaDB `READ ONLY` + `max_statement_time`, API menolak semua request selain GET, reminder & sinkron menu mati |
 | `DB_AUTH_<PROFIL>` | Profil hanya-baca: login, password & hak akses dibaca dari profil tulis ini (default `DB_PROFILE_DEFAULT`), karena password di database hanya-baca tidak bisa diatur |
+| `DB_WRITE_USERS_<PROFIL>` | `1` = pengecualian di profil hanya-baca: tabel `users` boleh ditulis (lihat di bawah). Default `0` |
 | `DB_ENV_FILE` | File .env tambahan yang hanya dipakai untuk `${...}` (mis. `../../.env` root berisi `DB_HOST/DB_USER/DB_PASS/DB_NAME` production); `${VAR:url}` = di-encode untuk URL |
 | `DB_PROFILE_DEFAULT`, `DB_PROFILE_FILE` | Profil awal; file penyimpan pilihan (default `config/db-profile.json`, git-ignored, + `db-switch.log`) |
 
@@ -88,11 +89,22 @@ halaman web hanya memilih profil (khusus role Developer, tidak masuk matriks hak
   ulang), jadwal reminder dibaca ulang, menuitem disinkron (bila diizinkan), dan dicatat di `datalog` (TableName
   `Database`) database tujuan.
 - Label database aktif selalu tampil di header untuk semua user.
-- Prisma CLI dan script (`npm run user:password`) tetap memakai `DATABASE_URL`, bukan profil aktif.
+- Prisma CLI dan script (`npm run user:password`) memakai `DATABASE_URL`, bukan profil aktif; `npm run user:password -- <username> --profile <profil>`
+  memakai profil dari `DB_PROFILES` (profil hanya-baca hanya bila `DB_WRITE_USERS_<PROFIL>=1`).
 - **Production hanya baca** (sekarang): `DB_URL_PRODUCTION=mysql://${DB_USER:url}:${DB_PASS:url}@${DB_HOST}:${DB_PORT}/${DB_NAME}`
   dengan `DB_ENV_FILE=../../.env`, `DB_READONLY_PRODUCTION=1`, `DB_AUTH_PRODUCTION=local`. Butuh VPN. Tombol simpan di web
   memberi pesan "dibuka khusus baca"; header menampilkan pita biru "Mode hanya baca". Endpoint yang tetap boleh: login,
   ganti password/profil (ditulis ke database login), tes & pindah database (`@AllowOnReadOnly()`).
+- **Pengecualian tabel users** — opsional, **sekarang mati** (`DB_WRITE_USERS_PRODUCTION=0`: production hanya baca untuk semua tabel).
+  Bila dinyalakan (`DB_WRITE_USERS_PRODUCTION=1`, hanya atas permintaan owner): login, user & hak akses dibaca dari
+  production sendiri (bukan `DB_AUTH_PRODUCTION`), dan tabel `users` boleh ditulis — login (LastLogin), ganti password/profil,
+  Security → Users tambah/edit (`@AllowUsersWrite()`). Hapus user tetap ditolak (ikut `usercookies`; nonaktifkan saja).
+  Penulisan lewat koneksi kedua (`src/prisma/users-only.ts`, sesi tidak READ ONLY, `max_statement_time` 120) yang **hanya**
+  mengizinkan `user.create`/`user.update` berisi nilai kolom biasa; tabel lain, hapus, upsert, `*Many` dan SQL mentah ditolak
+  (403). Koneksi utama tetap READ ONLY. JWT membawa sumber login (`auth`), jadi token lama tertolak saat flag diubah.
+  Pindah ke profil ini ditolak bila belum ada user `Developer` aktif berpassword bcrypt (tidak ada yang bisa login); atur dulu
+  dengan `npm run user:password -- <username> --profile production`. Password bcrypt **tidak bisa** dipakai login di aplikasi
+  GeneXus lama.
 - Saat go-live (aplikasi lama dimatikan): pakai user database khusus (bukan `gxmysql`), set `DB_READONLY_PRODUCTION=0`, atur
   password user di production, dan putuskan `Reminder Enabled`.
 

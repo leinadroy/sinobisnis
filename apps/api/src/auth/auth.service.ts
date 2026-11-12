@@ -51,7 +51,7 @@ export class AuthService {
       throw new UnauthorizedException('Username atau password salah.');
     }
     await this.prisma.authDb.user.update({ where: { id: u.id }, data: { lastLogin: new Date() } });
-    const payload: JwtPayload = { sub: u.id, db: this.prisma.activeProfile.key };
+    const payload: JwtPayload = { sub: u.id, db: this.prisma.activeProfile.key, auth: this.prisma.authSource };
     const accessToken = await this.jwt.signAsync(payload);
     const { exp } = this.jwt.decode(accessToken) as { exp: number };
     return { accessToken, expiresIn: exp - Math.floor(Date.now() / 1000), user: this.toSessionUser(u) };
@@ -65,7 +65,7 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Sesi login tidak valid atau sudah kedaluwarsa.');
     }
-    if (payload.db !== this.prisma.activeProfile.key) {
+    if (payload.db !== this.prisma.activeProfile.key || payload.auth !== this.prisma.authSource) {
       throw new UnauthorizedException('Database aplikasi sudah diganti. Silakan login ulang.');
     }
     const u = await this.findActiveUser({ id: payload.sub });

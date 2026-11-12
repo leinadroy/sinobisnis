@@ -20,5 +20,6 @@ export async function forwardToApi(path: string, init: RequestInit = {}): Promis
     const v = res.headers.get(h);
     if (v) headers.set(h, v);
   }
+  headers.set("x-content-type-options", "nosniff"); // jangan biarkan browser menebak tipe file (lampiran dibuka inline)
   return new Response(res.body, { status: res.status, headers });
 }

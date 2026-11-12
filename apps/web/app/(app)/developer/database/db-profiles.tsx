@@ -83,7 +83,9 @@ export function DbProfiles({ data }: { data: DbProfilesResponse }) {
                   <dt className="text-muted-foreground">Database</dt><dd>{p.database}</dd>
                   <dt className="text-muted-foreground">User</dt><dd>{p.user}</dd>
                   <dt className="text-muted-foreground">Sinkron menu</dt><dd>{p.menuSync ? "ya (menu baru 38–42 ditambahkan otomatis)" : "tidak"}</dd>
-                  {p.readOnly && <><dt className="text-muted-foreground">Login & akses</dt><dd>dari profil <b>{p.authLabel ?? "-"}</b> (password di database ini tidak bisa diatur)</dd></>}
+                  {p.readOnly && (p.usersWritable
+                    ? <><dt className="text-muted-foreground">Login & akses</dt><dd>dari database ini sendiri — <b>tabel users boleh ditulis</b> (tambah/edit user, password); tabel lain tetap hanya baca</dd></>
+                    : <><dt className="text-muted-foreground">Login & akses</dt><dd>dari profil <b>{p.authLabel ?? "-"}</b> (password di database ini tidak bisa diatur)</dd></>)}
                 </dl>
               ) : (
                 <p className="text-sm text-muted-foreground">Belum dikonfigurasi. Isi <code>DB_URL_{p.key.toUpperCase().replace(/[^A-Z0-9]/g, "_")}</code> di <code>apps/api/.env</code> lalu restart API.</p>
@@ -118,7 +120,9 @@ export function DbProfiles({ data }: { data: DbProfilesResponse }) {
             <AlertDialogDescription>
               Aplikasi akan memakai {target?.host}/{target?.database}. Koneksi dan struktur dicek dulu; bila gagal, database tidak berubah.
               Semua user (termasuk Anda) harus login ulang, dan jadwal reminder dibaca ulang dari database baru.
-              {target?.readOnly && <> Database ini <b>hanya dibaca</b>: semua simpan/hapus ditolak, reminder tidak dijalankan, dan login memakai akun dari profil {target.authLabel}.</>}
+              {target?.readOnly && (target.usersWritable
+                ? <> Database ini <b>hanya dibaca</b> kecuali tabel <b>users</b>: simpan/hapus data lain ditolak, reminder tidak dijalankan, dan login memakai akun dari database ini sendiri (butuh user Developer dengan password baru).</>
+                : <> Database ini <b>hanya dibaca</b>: semua simpan/hapus ditolak, reminder tidak dijalankan, dan login memakai akun dari profil {target.authLabel}.</>)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {target?.danger && (

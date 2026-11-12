@@ -1,12 +1,21 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import type { DbTestResult } from '@sml/shared';
+import { SUPER_ROLE, type DbTestResult } from '@sml/shared';
+import { BCRYPT_SALT } from '../auth/password.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { createAdapter } from './adapter.js';
+import { usersOnlyClient } from './users-only.js';
 import { EXPECTED_TABLES, loadProfiles, resolveActive, writeState, type DbProfile } from '../database/db-profiles.js';
 
 type SwitchListener = (profile: DbProfile) => unknown;
 
 const clientFor = (p: DbProfile) => new PrismaClient({ adapter: createAdapter(p.url, { readOnly: p.readOnly }) });
+
+/** User Developer aktif dengan password aplikasi baru (bcrypt) — tanpa ini tidak ada yang bisa login/pindah database. */
+const countDevelopersWithNewPassword = (db: PrismaClient) =>
+  db.user.count({ where: { isActive: true, salt: BCRYPT_SALT, role: { name: SUPER_ROLE } } });
+const NO_DEVELOPER_LOGIN = (key: string) =>
+  `Belum ada user ${SUPER_ROLE} aktif dengan password baru di database ${key}, jadi tidak ada yang bisa login. ` +
+  `Atur dulu: npm run user:password -- <username> --profile ${key}`;
 
 // Field internal diawali __ supaya tidak bentrok dengan nama model Prisma (mis. prisma.client = tabel client).
 // Semua method PrismaClient (prisma.user, $transaction, $queryRaw, …) diteruskan ke klien aktif lewat Proxy.
@@ -33,7 +42,13 @@ export class PrismaService implements OnModuleDestroy {
     this.__profile = resolveActive(profiles);
     this.__client = clientFor(this.__profile);
     this.__auth = this.__authFor(this.__profile, profiles);
-    this.__logger.log(`Profil database aktif: ${this.__profile.key} (${this.__profile.label})${this.__profile.readOnly ? ' — HANYA BACA' : ''}`);
+    this.__logger.log(`Profil database aktif: ${this.__profile.key} (${this.__profile.label})${this.__profile.readOnly ? ' — HANYA BACA' : ''}${this.__profile.usersWritable ? ' kecuali tabel users (login dari database ini)' : ''}`);
+    if (this.__profile.usersWritable && this.__auth) {
+      void countDevelopersWithNewPassword(this.__auth.client).then(
+        (n) => { if (!n) this.__logger.warn(NO_DEVELOPER_LOGIN(this.__profile.key)); },
+        () => undefined,
+      );
+    }
     return new Proxy(this, {
       get(target, prop, receiver) {
         if (prop in target) return Reflect.get(target, prop, receiver);
@@ -45,6 +60,8 @@ export class PrismaService implements OnModuleDestroy {
 
   private __authFor(profile: DbProfile, profiles: DbProfile[]) {
     if (!profile.readOnly) return null;
+    // Pengecualian tabel users: login & user dari database ini sendiri, lewat koneksi yang hanya boleh menulis users.
+    if (profile.usersWritable) return { client: usersOnlyClient(profile.url), profile };
     const auth = profiles.find((p) => p.key === profile.authKey && p.url && !p.readOnly);
     if (!auth) throw new Error(`Profil hanya-baca ${profile.key} butuh profil login (DB_AUTH_${profile.key.toUpperCase()}) yang bisa ditulis.`);
     return { client: clientFor(auth), profile: auth };
@@ -61,6 +78,14 @@ export class PrismaService implements OnModuleDestroy {
 
   get authProfile(): DbProfile {
     return this.__auth?.profile ?? this.__profile;
+  }
+
+  /**
+   * Penanda sumber login untuk JWT: profil asal user + mode. Berubah bila sumber login berubah (mis. production dari
+   * login lokal ke tabel users production), sehingga token lama — yang id usernya milik database lain — tertolak.
+   */
+  get authSource(): string {
+    return `${this.authProfile.key}${this.__profile.usersWritable ? ':users' : ''}`;
   }
 
   /** Dipanggil setelah pindah database (mis. muat ulang jadwal reminder, sinkron menuitem). */
@@ -118,10 +143,19 @@ export class PrismaService implements OnModuleDestroy {
       const check = await this.test(profile);
       if (!check.ok) return check;
       const auth = this.__authFor(profile, loadProfiles());
-      // Profil hanya-baca memakai database lain untuk login; pastikan itu juga hidup, kalau tidak semua user tidak bisa login lagi.
-      if (auth) {
+      if (profile.usersWritable && auth) {
+        // Login pindah ke tabel users database ini: tanpa satu pun Developer berpassword baru, tidak ada yang bisa login
+        // (juga untuk pindah database kembali lewat aplikasi).
+        const devs = await countDevelopersWithNewPassword(auth.client).catch(() => 0);
+        if (!devs) {
+          void auth.client.$disconnect().catch(() => undefined);
+          return { ...check, ok: false, error: NO_DEVELOPER_LOGIN(profile.key) };
+        }
+      } else if (auth) {
+        // Profil hanya-baca memakai database lain untuk login; pastikan itu juga hidup, kalau tidak semua user tidak bisa login lagi.
         const authCheck = await this.test(auth.profile);
         if (!authCheck.ok) {
+          void auth.client.$disconnect().catch(() => undefined);
           return { ...check, ok: false, error: `Database login (${auth.profile.key}) tidak bisa dipakai: ${authCheck.error ?? 'koneksi gagal'}` };
         }
       }

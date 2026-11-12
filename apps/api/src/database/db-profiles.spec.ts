@@ -40,6 +40,16 @@ describe('db-profiles', () => {
     expect(loadProfiles({ ...env, DB_AUTH_PRODUCTION: 'b' })[2].authKey).toBe('b');
   });
 
+  it('DB_WRITE_USERS_<PROFIL>=1: hanya untuk profil hanya-baca, login dari profil itu sendiri', () => {
+    const env = { DB_PROFILES: 'local,production', DB_URL_LOCAL: 'mysql://u@h/a', DB_URL_PRODUCTION: 'mysql://u@p/db' };
+    const [, ro] = loadProfiles(env);
+    expect([ro.readOnly, ro.usersWritable, ro.authKey]).toEqual([true, false, 'local']);
+    const [local, prod] = loadProfiles({ ...env, DB_WRITE_USERS_PRODUCTION: '1', DB_WRITE_USERS_LOCAL: '1' });
+    expect([prod.readOnly, prod.usersWritable, prod.authKey, prod.danger, prod.menuSync]).toEqual([true, true, null, false, false]);
+    expect(local.usersWritable).toBe(false); // profil tulis tidak butuh pengecualian
+    expect(loadProfiles({ ...env, DB_WRITE_USERS_PRODUCTION: 'yes' })[1].usersWritable).toBe(false); // hanya '1'
+  });
+
   it('DB_ENV_FILE + ${VAR:url}: password production dirujuk dari .env lain dan di-encode, tidak masuk process.env', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'dbe-'));
     const file = path.join(dir, '.env');

@@ -36,8 +36,9 @@ export class RolesService implements OnModuleInit {
     if (missing.length) this.logger.log(`Menu baru ditambahkan ke menuitem: ${missing.map(([, c]) => c).join(', ')}`);
   }
 
+  /** Pilihan role di form user: dari database login (sama dengan tempat user disimpan). */
   options() {
-    return this.prisma.role.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } });
+    return this.prisma.authDb.role.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } });
   }
 
   async list(q: ListQueryDto): Promise<Paginated<RoleRow>> {

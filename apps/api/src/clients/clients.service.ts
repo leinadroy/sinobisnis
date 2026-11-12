@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   CLIENT_DATE_FIELDS, CLIENT_TEXT_FIELDS, computeExpired, todayStr,
-  type ClientAttachmentRow, type ClientDetail, type ClientLogRow, type ClientRow, type Paginated, type PersonRow,
+  type ClientAttachmentRow, type ClientDetail, type ClientHistory, type ClientLogRow, type ClientRow, type Paginated, type PersonRow,
 } from '@sml/shared';
 import { Prisma, type Client } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -161,34 +161,52 @@ export class ClientsService {
   }
 
   async attachments(clientNo: number): Promise<ClientAttachmentRow[]> {
-    // Kolom blob tidak disentuh sama sekali: LENGTH(AttachmentBlob) memaksa MariaDB membaca seluruh isi file
-    // (production: 3 lampiran = 100+ detik vs 0,3 detik tanpa). Ukuran file tidak ada kolomnya, jadi tidak ditampilkan.
+    // Tabel attachment tidak punya index pada AttachmentClientNo → WHERE-nya full scan. Jangan sentuh kolom blob di scan itu:
+    // LENGTH(AttachmentBlob) di query yang sama membuat InnoDB membaca blob SEMUA baris (staging 22 dtk, production ~7,7 GB).
+    // Jadi ambil id dulu, lalu ukuran dihitung lewat primary key hanya untuk lampiran client ini.
     const rows = await this.prisma.$queryRaw<{ id: bigint; name: string | null }[]>`
       SELECT AttachmentId AS id, AttachmentName AS name FROM attachment WHERE AttachmentClientNo = ${BigInt(clientNo)} ORDER BY AttachmentId`;
+    if (!rows.length) return [];
+    const sizes = await this.prisma.$queryRaw<{ id: bigint; size: bigint | number | null }[]>`
+      SELECT AttachmentId AS id, LENGTH(AttachmentBlob) AS size FROM attachment WHERE AttachmentId IN (${Prisma.join(rows.map((r) => r.id))})`;
+    const size = new Map(sizes.map((s) => [Number(s.id), s.size === null ? null : Number(s.size)]));
     return rows.map((a) => {
       const name = attachmentName(a.name, Number(a.id));
-      return { id: Number(a.id), originalName: name, mime: mimeOf(name), size: null, uploadedAt: null };
+      return { id: Number(a.id), originalName: name, mime: mimeOf(name), size: size.get(Number(a.id)) ?? null, uploadedAt: null };
     });
   }
 
   async get(id: number): Promise<ClientDetail> {
     const c = await this.find(id);
-    const [row] = await this.decorate([c]);
-    const [attachments, conversations, history, first] = await Promise.all([
+    const [[row], attachments, conversations] = await Promise.all([
+      this.decorate([c]),
       this.attachments(id),
       this.prisma.conversation.findMany({ where: { tableName: 'Client', tableId: BigInt(id), isDeleted: false }, orderBy: { id: 'asc' }, include: { user: { select: { fullname: true } } } }),
-      this.prisma.dataLog.findMany({ where: { tableName: 'Client', tableId: id }, orderBy: { id: 'desc' }, take: 20, select: { id: true, created: true, userId: true, tableAction: true } }),
-      this.prisma.dataLog.findFirst({ where: { tableName: 'Client', tableId: id }, orderBy: { id: 'asc' }, select: { created: true } }),
     ]);
-    const users = await this.userNames(history.map((h) => h.userId));
     return {
       ...row,
       pembayaranPnbp: d2s(c.pembayaranPnbp),
-      createdAt: dt2s(first?.created),
-      updatedAt: dt2s(history[0]?.created),
       attachments,
       conversations: conversations.map((m) => ({ id: Number(m.id), userName: m.user.fullname, message: m.text, createdAt: dt2s(m.createdAt)! })),
-      history: history.map((h) => ({ id: Number(h.id), historyDate: dt2s(h.created)!, userName: users.get(h.userId) ?? null, action: h.tableAction || 'Update' })),
+    };
+  }
+
+  /**
+   * Riwayat perubahan dari datalog. Tabel datalog (~350 rb baris) tidak punya index pada TableId, jadi setiap query = full scan
+   * (±5 dtk). Cukup SATU scan tanpa ORDER BY/LIMIT (log per client sedikit), diurutkan di sini — bukan dua query terpisah.
+   */
+  async history(id: number): Promise<ClientHistory> {
+    await this.find(id);
+    const logs = await this.prisma.dataLog.findMany({
+      where: { tableName: 'Client', tableId: id }, select: { id: true, created: true, userId: true, tableAction: true },
+    });
+    logs.sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+    const latest = logs.slice(0, 20);
+    const users = await this.userNames(latest.map((h) => h.userId));
+    return {
+      createdAt: dt2s(logs.at(-1)?.created),
+      updatedAt: dt2s(logs[0]?.created),
+      items: latest.map((h) => ({ id: Number(h.id), historyDate: dt2s(h.created)!, userName: users.get(h.userId) ?? null, action: h.tableAction || 'Update' })),
     };
   }
 
