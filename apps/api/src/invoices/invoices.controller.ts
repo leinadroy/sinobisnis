@@ -11,6 +11,7 @@ import type { AuthUser } from '../auth/auth.types.js';
 import {
   CreateInvoiceDto, InvoiceableQueryDto, InvoiceListQueryDto, PriceListQueryDto, RequestEditDto, RequestListQueryDto, SaveInvoiceDto,
 } from './invoices.dto.js';
+import { fileDisposition } from '../clients/clients.service.js';
 import { InvoicesService } from './invoices.service.js';
 
 // Lampiran disimpan sebagai blob di tabel invoiceattachment (seperti aplikasi lama), jadi file ditahan di memori.
@@ -93,10 +94,11 @@ export class InvoicesController {
 
   @Menu('invoices', 'view')
   @Get('attachments/:aid/file')
-  async download(@Param('aid', ParseIntPipe) aid: number, @Res({ passthrough: true }) res: Response) {
+  async download(@Param('aid', ParseIntPipe) aid: number, @Query('download') download: string | undefined, @Res({ passthrough: true }) res: Response) {
     const a = await this.invoices.attachment(aid);
     res.setHeader('Content-Type', a.mime);
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(a.name)}`);
+    res.setHeader('Content-Disposition', fileDisposition(a.name, a.mime, download === '1'));
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     return new StreamableFile(a.data);
   }
 

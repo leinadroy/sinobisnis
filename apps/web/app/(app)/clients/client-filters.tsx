@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MasterOptions } from "@sml/shared";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/ui/search-select";
@@ -52,11 +53,11 @@ export function ClientFilters({ options }: { options: MasterOptions }) {
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
           <Label htmlFor="f-from" className="text-xs text-muted-foreground">Permohonan dari</Label>
-          <Input id="f-from" type="date" value={v.from} onChange={(e) => set("from", e.target.value)} />
+          <DateInput id="f-from" value={v.from} onChange={(x) => set("from", x)} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="f-to" className="text-xs text-muted-foreground">sampai</Label>
-          <Input id="f-to" type="date" value={v.to} onChange={(e) => set("to", e.target.value)} />
+          <DateInput id="f-to" value={v.to} onChange={(x) => set("to", x)} />
         </div>
       </div>
       <div className="space-y-1">

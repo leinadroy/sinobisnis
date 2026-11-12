@@ -1,8 +1,9 @@
 import { forwardToApi } from "@/lib/bff";
 
-/** Unduh lampiran invoice. */
-export async function GET(_: Request, { params }: RouteContext<"/bff/invoices/attachments/[aid]">) {
+/** Buka (inline) atau unduh (?download=1) lampiran invoice. */
+export async function GET(req: Request, { params }: RouteContext<"/bff/invoices/attachments/[aid]">) {
   const { aid } = await params;
   if (!/^\d+$/.test(aid)) return Response.json({ message: "Lampiran tidak ditemukan." }, { status: 404 });
-  return forwardToApi(`/invoices/attachments/${aid}/file`);
+  const download = new URL(req.url).searchParams.get("download") === "1" ? "?download=1" : "";
+  return forwardToApi(`/invoices/attachments/${aid}/file${download}`);
 }

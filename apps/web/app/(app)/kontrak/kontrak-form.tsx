@@ -9,6 +9,7 @@ import type { KontrakInput, MasterOptions } from "@sml/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/ui/search-select";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -63,7 +64,7 @@ export function KontrakForm({ id, options, canEdit, initial }: Props) {
             <FieldGroup className="grid gap-4 sm:grid-cols-3">
               <Field>
                 <FieldLabel htmlFor="k-date">Tanggal Kontrak</FieldLabel>
-                <Input id="k-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DateInput id="k-date" value={date} onChange={setDate} />
                 <FieldDescription>Berlaku untuk invoice bertanggal sama atau sesudahnya.</FieldDescription>
               </Field>
               <Field>

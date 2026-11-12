@@ -54,3 +54,6 @@ sml_apps.txt
 docker/fonts/*.ttf
 docker/fonts/*.TTF
 docker/fonts/*.otf
+
+# Catatan formula hash GeneXus, berisi SystemSalt rahasia
+LogicGx.txt

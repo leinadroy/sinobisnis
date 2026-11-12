@@ -55,6 +55,17 @@ $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 if (-not $admin) { throw "Jalankan PowerShell sebagai Administrator." }
 $Domain = $Domain.TrimEnd("/")
 $isHttp = $Domain -like "http://*"
+# Dipasang di server database production itu sendiri? Maka MariaDB "lokal" = production: database login wajib nama lain.
+$onProdHost = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | ForEach-Object IPAddress) -contains $ProdHost
+if ($onProdHost) { Write-Host "PERHATIAN: script berjalan di server database production ($ProdHost). Database login memakai nama terpisah; database 'sinobisnis' tidak akan ditulis." -ForegroundColor Yellow }
+function AskLocalDb {
+  $def = if ($onProdHost) { "sinobisnis_login" } else { "sinobisnis" }
+  while ($true) {
+    $n = Ask "Nama database login lokal" $def
+    if ($onProdHost -and $n -ieq "sinobisnis") { Warn "Di server ini 'sinobisnis' adalah database PRODUCTION. Pakai nama lain."; continue }
+    return $n
+  }
+}
 
 # ---------------------------------------------------------------- 1. Prasyarat
 Step "1. Cek prasyarat"
@@ -109,14 +120,15 @@ Ok "Kode di $AppDir ($((git rev-parse --short HEAD).Trim()))"
 Step "3. Konfigurasi (.env)"
 $rootEnv = Join-Path $AppDir ".env"
 $apiEnv = Join-Path $AppDir "apps\api\.env"
-$localUser = $null; $localPass = $null
+$localUser = $null; $localPass = $null; $localDb = $null
 if (Test-Path $rootEnv) {
   Ok ".env root sudah ada, tidak diubah."
 } else {
   Write-Host "  Production dibaca dengan user khusus baca (GRANT SELECT saja). Jangan pakai gxmysql."
   $prodUser = Ask "User database production (hanya baca)" "sinobisnis_ro"
   $prodPass = AskSecret "Password $prodUser"
-  $localUser = Ask "User MariaDB lokal server (hak penuh pada database sinobisnis)" "sinobisnis_local"
+  $localDb = AskLocalDb
+  $localUser = Ask "User MariaDB lokal server (hak penuh HANYA pada database $localDb)" "sinobisnis_local"
   $localPass = AskSecret "Password $localUser"
   $content = @"
 # Dibuat oleh setup-server.ps1 $(Get-Date -Format "yyyy-MM-dd"). Jangan di-commit.
@@ -130,7 +142,7 @@ DB_PASS=$prodPass
 # MariaDB lokal server (login, user, hak akses selama Fase A)
 LOCAL_DB_HOST=127.0.0.1
 LOCAL_DB_PORT=3306
-LOCAL_DB_NAME=sinobisnis
+LOCAL_DB_NAME=$localDb
 LOCAL_DB_USER=$localUser
 LOCAL_DB_PASS=$localPass
 "@
@@ -141,6 +153,7 @@ if (Test-Path $apiEnv) {
   Ok "apps\api\.env sudah ada, tidak diubah."
 } else {
   if (-not $localUser) {
+    $localDb = AskLocalDb
     $localUser = Ask "User MariaDB lokal server" "sinobisnis_local"
     $localPass = AskSecret "Password $localUser"
   }
@@ -151,7 +164,7 @@ if (Test-Path $apiEnv) {
   $content = @'
 # Dibuat oleh setup-server.ps1. Jangan di-commit.
 # Database login lokal (Prisma CLI & npm run user:password juga memakai ini)
-DATABASE_URL="mysql://__LU__:__LP__@localhost:3306/sinobisnis"
+DATABASE_URL="mysql://__LU__:__LP__@localhost:3306/__LDB__"
 
 JWT_SECRET="__JWT__"
 JWT_EXPIRES_IN="12h"
@@ -174,7 +187,7 @@ DB_PROFILE_DEFAULT=production
 # Reminder masih dikirim aplikasi lama selama Fase A
 REMINDER_SCHEDULER=off
 '@
-  $content = $content.Replace("__LU__", (Enc $localUser)).Replace("__LP__", (Enc $localPass)).Replace("__JWT__", $jwt).Replace("__DOMAIN__", $Domain)
+  $content = $content.Replace("__LU__", (Enc $localUser)).Replace("__LP__", (Enc $localPass)).Replace("__JWT__", $jwt).Replace("__DOMAIN__", $Domain).Replace("__LDB__", $localDb)
   [IO.File]::WriteAllText($apiEnv, $content, $utf8)
   Ok "apps\api\.env dibuat (JWT_SECRET baru)."
 }
@@ -182,7 +195,7 @@ REMINDER_SCHEDULER=off
 # ---------------------------------------------------------------- 4. Data login lokal
 Step "4. Salin production ke MariaDB lokal (production hanya dibaca)"
 if ($SkipClone) { Warn "Dilewati (-SkipClone)." }
-elseif (YesNo "Salin struktur + data production ke database lokal 'sinobisnis' sekarang? Isi database lokal itu DIGANTI") {
+elseif (YesNo "Salin struktur + data production ke database login lokal (LOCAL_DB_NAME di .env root) sekarang? Isi database itu DIGANTI") {
   Run "clone_production.py all --replace (termasuk verifikasi jumlah baris)" { python tools\migrate\clone_production.py all --replace }
 } else { Warn "Dilewati. Database lokal harus sudah berisi tabel users/role/menuitem." }
 

@@ -11,7 +11,7 @@ import { attachmentName, ClientsService, mimeOf } from '../clients/clients.servi
 import { d2s, GX_EMPTY_DATE, s2d } from '../common/dates.js';
 import { paginated } from '../common/list-query.dto.js';
 import { KontrakService } from '../kontrak/kontrak.service.js';
-import { matchBillTo } from '../master/master.service.js';
+import { billToUsage, matchBillTo } from '../master/master.service.js';
 import { groupsToRows, normName, rowsToGroups, type Group } from './invoice-rows.js';
 import type { CreateInvoiceDto, InvoiceableQueryDto, InvoiceListQueryDto, RequestListQueryDto, SaveInvoiceDto } from './invoices.dto.js';
 
@@ -154,11 +154,13 @@ export class InvoicesService {
    * (InvoiceDetailClientNo), lalu id. Lampiran upload langsung ke invoice (tanpa client) di akhir.
    */
   private async attachments(invoiceId: number): Promise<InvoiceAttachmentRow[]> {
-    // Ukuran dihitung di database supaya blob tidak ikut terbaca. Lampiran rujukan memakai blob tabel attachment.
+    // Dua langkah, sama seperti lampiran client: InvoiceAttachmentInvoiceId tidak ber-index (struktur DB tidak boleh
+    // diubah), dan kalau LENGTH(blob) ada di query yang sama MariaDB membaca blob semua baris (~2,3 GB, ±27 detik di
+    // production). Jadi cari id-nya dulu tanpa blob (±0,4 detik), lalu hitung ukuran per primary key.
     const [rows, details] = await Promise.all([
-      this.prisma.$queryRaw<{ id: bigint; name: string | null; size: bigint | number | null; ref: bigint | null; refName: string | null; refSize: bigint | number | null; clientNo: bigint | null; clientName: string | null }[]>`
-        SELECT ia.InvoiceAttachmentId AS id, ia.InvoiceAttachmentName AS name, LENGTH(ia.InvoiceAttachmentBlob) AS size,
-               ia.InvoiceAttachmentIdInvoice AS ref, a.AttachmentName AS refName, LENGTH(a.AttachmentBlob) AS refSize,
+      this.prisma.$queryRaw<{ id: bigint; name: string | null; ref: bigint | null; refName: string | null; clientNo: bigint | null; clientName: string | null }[]>`
+        SELECT ia.InvoiceAttachmentId AS id, ia.InvoiceAttachmentName AS name,
+               ia.InvoiceAttachmentIdInvoice AS ref, a.AttachmentName AS refName,
                a.AttachmentClientNo AS clientNo, c.ClientName AS clientName
         FROM invoiceattachment ia
         LEFT JOIN attachment a ON a.AttachmentId = ia.InvoiceAttachmentIdInvoice
@@ -166,12 +168,27 @@ export class InvoicesService {
         WHERE ia.InvoiceAttachmentInvoiceId = ${invoiceId} ORDER BY ia.InvoiceAttachmentId`,
       this.prisma.invoiceDetail.findMany({ where: { invoiceId, clientNo: { gt: 0 } }, select: { clientNo: true }, orderBy: { id: 'asc' } }),
     ]);
+    const ownIds = rows.filter((r) => !r.ref).map((r) => r.id);
+    const refIds = [...new Set(rows.filter((r) => r.ref).map((r) => r.ref!))];
+    const [ownSizes, refSizes] = await Promise.all([
+      ownIds.length
+        ? this.prisma.$queryRaw<{ id: bigint; size: bigint | number | null }[]>`
+            SELECT InvoiceAttachmentId AS id, LENGTH(InvoiceAttachmentBlob) AS size FROM invoiceattachment
+            WHERE InvoiceAttachmentId IN (${Prisma.join(ownIds)})`
+        : [],
+      refIds.length
+        ? this.prisma.$queryRaw<{ id: bigint; size: bigint | number | null }[]>`
+            SELECT AttachmentId AS id, LENGTH(AttachmentBlob) AS size FROM attachment WHERE AttachmentId IN (${Prisma.join(refIds)})`
+        : [],
+    ]);
+    const own = new Map(ownSizes.map((s) => [String(s.id), Number(s.size ?? 0)]));
+    const refd = new Map(refSizes.map((s) => [String(s.id), Number(s.size ?? 0)]));
     const order = new Map<string, number>();
     for (const d of details) if (!order.has(String(d.clientNo))) order.set(String(d.clientNo), order.size + 1);
     const pos = (clientNo: bigint | null) => (clientNo ? order.get(String(clientNo)) ?? 999 : 1000);
     return [...rows].sort((a, b) => pos(a.clientNo) - pos(b.clientNo) || Number(a.id) - Number(b.id)).map((r) => {
       const name = r.ref ? attachmentName(r.refName, Number(r.ref)) : attachmentName(r.name, Number(r.id)).replace(/^lampiran-/, 'lampiran-invoice-');
-      const size = Number(r.ref ? r.refSize ?? 0 : r.size ?? 0);
+      const size = r.ref ? refd.get(String(r.ref)) ?? 0 : own.get(String(r.id)) ?? 0;
       return { id: Number(r.id), originalName: name, mime: mimeOf(name), size: size || null, uploadedAt: null, clientName: r.clientName?.trim() || null };
     });
   }
@@ -224,8 +241,8 @@ export class InvoicesService {
   /** Client yang bisa di-invoice (belum punya No Invoice, tidak diarsip/dihapus). Maks 500 baris. */
   async invoiceable(q: InvoiceableQueryDto): Promise<InvoiceableClientRow[]> {
     const and: Prisma.ClientWhereInput[] = [INVOICEABLE];
-    const [projects, billTos] = await Promise.all([this.prisma.sponsorProject.findMany(), this.prisma.billTo.findMany()]);
-    const projectBillTo = new Map(projects.map((p) => [p.id, matchBillTo(p, billTos)]));
+    const [projects, billTos, usage] = await Promise.all([this.prisma.sponsorProject.findMany(), this.prisma.billTo.findMany(), billToUsage(this.prisma)]);
+    const projectBillTo = new Map(projects.map((p) => [p.id, matchBillTo(p, billTos, usage)]));
     if (q.sponsorId) and.push({ sponsorId: q.sponsorId });
     if (q.projectId) and.push({ projectId: q.projectId });
     if (q.billToId) and.push({ projectId: { in: projects.filter((p) => projectBillTo.get(p.id) === q.billToId).map((p) => p.id) } });
@@ -250,6 +267,34 @@ export class InvoicesService {
    * Baris company dikunci (SELECT … FOR UPDATE) supaya dua Create Invoice bersamaan tidak mendapat nomor yang sama;
    * bila nomor hasil format sudah dipakai invoice lain, penghitung dinaikkan lagi.
    */
+  /**
+   * Lampiran client ikut ke invoice seperti aplikasi lama: satu baris invoiceattachment per lampiran client, berisi
+   * rujukan InvoiceAttachmentIdInvoice = AttachmentId (blob kosong, nama NULL). Lampiran yang sudah dirujuk tidak
+   * digandakan. `remove`: rujukan ke lampiran client yang dikeluarkan dari invoice dihapus (upload langsung ke invoice tetap).
+   */
+  private async syncClientAttachments(tx: Prisma.TransactionClient, invoiceId: number, add: number[], remove: number[] = []) {
+    if (remove.length) {
+      const gone = await tx.$queryRaw<{ id: bigint }[]>`
+        SELECT AttachmentId AS id FROM attachment WHERE AttachmentClientNo IN (${Prisma.join(remove.map(BigInt))})`;
+      if (gone.length) await tx.invoiceAttachment.deleteMany({ where: { invoiceId, attachmentRefId: { in: gone.map((g) => g.id) } } });
+    }
+    if (!add.length) return;
+    // Tanpa kolom blob: AttachmentClientNo tidak ber-index, jadi ini full scan (lihat ClientsService.attachments).
+    const atts = await tx.$queryRaw<{ id: bigint; clientNo: bigint }[]>`
+      SELECT AttachmentId AS id, AttachmentClientNo AS clientNo FROM attachment
+      WHERE AttachmentClientNo IN (${Prisma.join(add.map(BigInt))}) ORDER BY AttachmentId`;
+    if (!atts.length) return;
+    const have = new Set((await tx.invoiceAttachment.findMany({ where: { invoiceId, attachmentRefId: { not: null } }, select: { attachmentRefId: true } }))
+      .map((r) => String(r.attachmentRefId)));
+    // Urutan client seperti di baris invoice, lalu id lampiran.
+    const pos = new Map(add.map((c, i) => [String(c), i]));
+    const fresh = atts.filter((a) => !have.has(String(a.id)))
+      .sort((a, b) => (pos.get(String(a.clientNo)) ?? 0) - (pos.get(String(b.clientNo)) ?? 0) || Number(a.id) - Number(b.id));
+    if (fresh.length) {
+      await tx.invoiceAttachment.createMany({ data: fresh.map((a) => ({ invoiceId, attachmentRefId: a.id, blob: new Uint8Array(0) })) });
+    }
+  }
+
   private async nextNumber(tx: Prisma.TransactionClient, companyId: number, date: string) {
     await tx.$queryRaw`SELECT CompanyId FROM company WHERE CompanyId = ${companyId} FOR UPDATE`;
     const co = await tx.company.findUniqueOrThrow({ where: { id: companyId } });
@@ -281,7 +326,7 @@ export class InvoicesService {
     if (!billToId) {
       const projectId = clients.find((c) => c.projectId)?.projectId;
       const project = projectId ? await this.prisma.sponsorProject.findUnique({ where: { id: projectId } }) : null;
-      if (project) billToId = matchBillTo(project, await this.prisma.billTo.findMany());
+      if (project) billToId = matchBillTo(project, await this.prisma.billTo.findMany(), await billToUsage(this.prisma));
     }
     const billTo = billToId ? await this.prisma.billTo.findUnique({ where: { id: billToId } }) : null;
     if (billToId && !billTo) throw new BadRequestException('Bill To tidak ditemukan.');
@@ -315,6 +360,7 @@ export class InvoicesService {
       // Syarat "belum ber-invoice" diulang di sini supaya client yang baru saja di-invoice user lain tidak tertimpa.
       const linked = await tx.client.updateMany({ where: { no: { in: ids.map(BigInt) }, ...INVOICEABLE }, data: { noInvoice: no, tanggalInvoice: s2d(date) } });
       if (linked.count !== ids.length) throw new ConflictException('Sebagian client baru saja dimasukkan ke invoice lain. Muat ulang daftar client.');
+      await this.syncClientAttachments(tx, Number(created.id), groups.flatMap((g) => g.clients.map((c) => c.clientId!)));
       return created;
     });
 
@@ -423,6 +469,10 @@ export class InvoicesService {
         const linked = await tx.client.updateMany({ where: { no: { in: added.map(BigInt) }, ...INVOICEABLE }, data: linkData });
         if (linked.count !== added.length) throw new ConflictException('Sebagian client baru saja dimasukkan ke invoice lain. Muat ulang halaman.');
       }
+      // Lampiran ikut client: yang baru masuk invoice ditambahkan, yang dikeluarkan dihapus rujukannya.
+      const inNow = groups.flatMap((g) => g.clients.map((c) => c.clientId).filter((x): x is number => !!x));
+      const dropped = [...members].filter((c) => !unique.has(c));
+      await this.syncClientAttachments(tx, id, inNow.filter((c) => !members.has(c)), dropped);
       // Izin edit hanya berlaku untuk satu kali simpan.
       if (wasApproved) await tx.updateRequest.updateMany({ where: { invoiceId: inv.id, status: 'APPROVED' }, data: { status: 'DONE', updatedDate: s2d(todayStr())! } });
     });

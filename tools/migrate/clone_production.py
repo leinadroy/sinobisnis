@@ -152,9 +152,18 @@ class Target:
             if "staging" not in self.name.lower():
                 sys.exit(f"Nama database staging harus mengandung 'staging' (sekarang: {self.name}); dibatalkan.")
         with self.connect() as c, c.cursor() as cur:
-            cur.execute("SELECT VERSION()")
-            self.version = cur.fetchone()[0]
+            cur.execute("SELECT VERSION(), @@hostname, @@port, @@datadir")
+            self.version, t_host, t_port, t_dir = cur.fetchone()
         self.mysql = "mariadb" not in self.version.lower()
+        # Pengaman: "localhost" bisa saja server production itu sendiri (mis. aplikasi dipasang di 10.10.3.23).
+        # Database production (atau nama yang sama di server production) tidak pernah boleh jadi tujuan.
+        prod = query("SELECT @@hostname AS h, @@port AS p, @@datadir AS d")[0]
+        same_server = (str(t_host).lower(), int(t_port), str(t_dir).lower()) == (str(prod["h"]).lower(), int(prod["p"]), str(prod["d"]).lower())
+        if same_server and self.name.lower() == os.environ.get("DB_NAME", SCHEMA).lower():
+            sys.exit(f"Tujuan {self.label} '{self.name}' ADALAH database production ({prod['h']}:{prod['p']}); dibatalkan. "
+                     "Pakai nama database lain lewat LOCAL_DB_NAME (mis. sinobisnis_login).")
+        if same_server:
+            print(f"  [!] Tujuan berada di server production ({prod['h']}); hanya database '{self.name}' yang ditulis.")
 
     def connect(self, db=None):
         return pymysql.connect(**self._cfg, database=db, charset="utf8mb4", autocommit=False, local_infile=False,

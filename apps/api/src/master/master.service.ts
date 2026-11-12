@@ -11,14 +11,53 @@ type Row = Record<string, any>;
 const norm = (s: string | null | undefined) => (s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 /**
+ * Opsi dropdown Bill To. Nama yang dipakai lebih dari satu Bill To (mis. dua "Sinohydro Corporation Limited") diberi
+ * pembeda supaya user tidak salah pilih: kode perusahaan / NPWP bila ada, dan selalu nomor id.
+ */
+export function billToOptions(billTos: { id: number; companyName: string; npwp: string; kodePerusahaan: string }[]) {
+  const count = new Map<string, number>();
+  for (const b of billTos) count.set(norm(b.companyName), (count.get(norm(b.companyName)) ?? 0) + 1);
+  return billTos.map((b) => {
+    const extra = (count.get(norm(b.companyName)) ?? 0) > 1
+      ? ` (${[b.kodePerusahaan.trim(), b.npwp.trim() && `NPWP ${b.npwp.trim()}`, `#${b.id}`].filter(Boolean).join(' · ')})`
+      : '';
+    return { id: b.id, label: `${b.companyName}${extra}`, npwp: b.npwp || null };
+  });
+}
+
+/** Pemakaian Bill To per sponsor di invoice: key `${sponsorId}:${billToId}` → nilai urut (makin besar makin baru). */
+export type BillToUsage = Map<string, number>;
+
+/** Dari invoice yang ada: kapan terakhir tiap sponsor memakai tiap Bill To (tanggal invoice, lalu id). */
+export async function billToUsage(prisma: { $queryRaw: PrismaService['$queryRaw'] }): Promise<BillToUsage> {
+  const rows = await prisma.$queryRaw<{ s: number; b: number; d: Date | null; i: bigint }[]>`
+    SELECT InvoiceSponsorId AS s, BillToId AS b, MAX(InvoiceDate) AS d, MAX(InvoiceId) AS i FROM invoice
+    WHERE BillToId > 0 AND InvoiceSponsorId > 0 GROUP BY InvoiceSponsorId, BillToId`;
+  return new Map(rows.map((r) => [`${r.s}:${r.b}`, (r.d?.getTime() ?? 0) * 1e5 + Number(r.i)]));
+}
+
+/**
  * Bill To yang cocok untuk Sponsor Project (project menyimpan data perusahaan sendiri, bukan relasi):
- * nama perusahaan sama, lalu NPWP, lalu kode perusahaan yang hanya cocok dengan satu Bill To.
+ * nama perusahaan sama, lalu NPWP, lalu kode perusahaan. Satu yang cocok → dipakai. Lebih dari satu (mis. dua Bill To
+ * bernama sama "Sinohydro Corporation Limited") → yang terakhir dipakai sponsor project itu di invoice; belum pernah
+ * dipakai → lanjut ke kriteria berikutnya, akhirnya null (user memilih sendiri).
  */
 export function matchBillTo(
-  project: { companyName: string; npwp: string; kodePerusahaan: string },
+  project: { companyName: string; npwp: string; kodePerusahaan: string; sponsorId?: number | null },
   billTos: { id: number; companyName: string; npwp: string; kodePerusahaan: string }[],
+  usage?: BillToUsage,
 ): number | null {
-  const pick = (xs: typeof billTos) => (xs.length === 1 ? xs[0].id : null);
+  const pick = (xs: typeof billTos) => {
+    if (xs.length === 1) return xs[0].id;
+    if (!xs.length || !usage || !project.sponsorId) return null;
+    let best: number | null = null;
+    let bestAt = 0;
+    for (const b of xs) {
+      const at = usage.get(`${project.sponsorId}:${b.id}`) ?? 0;
+      if (at > bestAt) [best, bestAt] = [b.id, at];
+    }
+    return best;
+  };
   return pick(billTos.filter((b) => norm(b.companyName) && norm(b.companyName) === norm(project.companyName)))
     ?? pick(billTos.filter((b) => b.npwp.trim() && b.npwp.trim() === project.npwp.trim()))
     ?? pick(billTos.filter((b) => b.kodePerusahaan.trim() && b.kodePerusahaan.trim() === project.kodePerusahaan.trim()));
@@ -132,7 +171,7 @@ export class MasterService {
 
   /** Pilihan dropdown untuk semua form (client, master, invoice, kontrak). Placeholder lama disembunyikan. */
   async options(): Promise<MasterOptions> {
-    const [sponsors, billTos, banks, projects, keperluan, taxes, companies] = await Promise.all([
+    const [sponsors, billTos, banks, projects, keperluan, taxes, companies, usage] = await Promise.all([
       this.prisma.sponsor.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, isActive: true } }),
       this.prisma.billTo.findMany({ where: { NOT: { companyName: { startsWith: '==' } } }, orderBy: { companyName: 'asc' } }),
       this.prisma.bankAccount.findMany({ orderBy: { bankName: 'asc' }, select: { id: true, bankName: true, accountNo: true } }),
@@ -140,12 +179,13 @@ export class MasterService {
       this.prisma.keperluan.findMany({ orderBy: { name: 'asc' } }),
       this.prisma.tax.findMany({ orderBy: { id: 'asc' } }),
       this.prisma.company.findMany({ where: { id: { gt: 0 } }, orderBy: { name: 'asc' }, select: { id: true, name: true, bankAccountId: true, invoiceNoFormat: true } }),
+      billToUsage(this.prisma),
     ]);
     return {
       sponsors,
-      billTos: billTos.map((b) => ({ id: b.id, label: b.companyName, npwp: b.npwp || null })),
+      billTos: billToOptions(billTos),
       bankAccounts: banks.map((b) => ({ id: b.id, label: `${b.bankName} _ ${b.accountNo}` })),
-      projects: projects.map((p) => ({ id: p.id, name: p.name, sponsorId: p.sponsorId, companyName: p.companyName || null, billToId: matchBillTo(p, billTos) })),
+      projects: projects.map((p) => ({ id: p.id, name: p.name, sponsorId: p.sponsorId, companyName: p.companyName || null, billToId: matchBillTo(p, billTos, usage) })),
       keperluan: keperluan.map((k) => ({
         id: k.id, name: k.name, periode: k.periode ?? 0, periodeIn: k.periodeIn?.trim() || 'MONTHS',
         sumberData: k.sumberData?.trim() || 'TANGGAL TERBIT DOKUMEN', isActive: k.isActive,

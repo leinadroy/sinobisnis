@@ -108,7 +108,8 @@ export function AppShell({ nav, user, database, showDbLink, children }: {
       </header>
       {database.readOnly && (
         <div className="border-b border-blue-200 bg-blue-50 px-3 py-1.5 text-center text-xs text-blue-900 md:text-sm">
-          Mode hanya baca — data dari database <b>{database.label}</b>. Perubahan tidak akan disimpan.
+          Mode hanya baca — data dari database <b>{database.label}</b>. Perubahan tidak akan disimpan
+          {database.usersWritable ? <>, kecuali data user (Security → Users &amp; password).</> : "."}
         </div>
       )}
       <div className="flex flex-1">

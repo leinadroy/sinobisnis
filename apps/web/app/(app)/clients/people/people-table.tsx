@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { History, Plus } from "lucide-react";
+import { History, Pencil, Plus } from "lucide-react";
 import type { Paginated, PersonRow } from "@sml/shared";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/data-table";
@@ -13,6 +13,11 @@ import { fmtDate } from "@/lib/format";
 export function PeopleTable({ list, canCreate }: { list: Paginated<PersonRow>; canCreate: boolean }) {
   const actions = (p: PersonRow) => (
     <>
+      {canCreate && (
+        <Button variant="ghost" size="sm" nativeButton={false} title="Edit data permohonan terakhir" render={<Link href={`/clients/${p.lastId}`} />}>
+          <Pencil /> Edit
+        </Button>
+      )}
       <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`/clients?search=${encodeURIComponent(p.noPaspor || p.name)}`} />}>
         <History /> Riwayat
       </Button>

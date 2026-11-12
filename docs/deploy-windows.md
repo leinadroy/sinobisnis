@@ -28,6 +28,19 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\setup-server.ps1 -Domain https://sinobisnis.x.com  # dengan domain; binding https diatur manual
 ```
 
+**Dipasang di server database production (10.10.3.23)?** Di sana "MariaDB lokal" (127.0.0.1:3306) adalah production
+itu sendiri. Database login Fase A wajib memakai **nama lain**, mis. `sinobisnis_login`, dengan user yang hanya punya hak
+pada database itu:
+
+```sql
+CREATE USER 'sinobisnis_local'@'localhost' IDENTIFIED BY '<password-kuat>';
+GRANT ALL PRIVILEGES ON sinobisnis_login.* TO 'sinobisnis_local'@'localhost';
+```
+
+`setup-server.ps1` mendeteksi server ini dan menolak nama `sinobisnis`; `clone_production.py` juga menolak menulis ke
+database production walau lewat `localhost`. MariaDB sudah ada, jadi tidak perlu dipasang lagi. Cek juga apakah port 80
+sudah dipakai aplikasi lama.
+
 ---
 
 ## 1. Software di server

@@ -26,6 +26,14 @@ const toRow = (u: UserWithRole): UserRow => ({
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Database login: sama dengan tempat AuthService membaca user. Di database hanya-baca = profil login (mis. lokal),
+   * atau — dengan DB_WRITE_USERS_<PROFIL>=1 — koneksi khusus tabel users di database itu sendiri.
+   */
+  private get db() {
+    return this.prisma.authDb;
+  }
+
   async list(q: ListQueryDto): Promise<Paginated<UserRow>> {
     const s = q.search?.trim();
     // Collation MariaDB (utf8_general_ci) sudah tidak membedakan huruf besar/kecil.
@@ -34,34 +42,34 @@ export class UsersService {
       : {};
     const orderBy = (SORTABLE[q.sort ?? ''] ?? SORTABLE.fullname)(q.order);
     const [rows, total] = await Promise.all([
-      this.prisma.user.findMany({ where, orderBy: [orderBy, { id: 'asc' }], skip: q.skip, take: q.pageSize, include: { role: true } }),
-      this.prisma.user.count({ where }),
+      this.db.user.findMany({ where, orderBy: [orderBy, { id: 'asc' }], skip: q.skip, take: q.pageSize, include: { role: true } }),
+      this.db.user.count({ where }),
     ]);
     return paginated(rows.map(toRow), total, q);
   }
 
   async get(id: number): Promise<UserRow> {
-    const u = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
+    const u = await this.db.user.findUnique({ where: { id }, include: { role: true } });
     if (!u) throw new NotFoundException('User tidak ditemukan.');
     return toRow(u);
   }
 
   /** Tabel users lama tidak punya index unik username, jadi dicek di sini. */
   private async ensureUniqueUsername(username: string, exceptId?: number) {
-    const dup = await this.prisma.user.count({ where: { username, ...(exceptId ? { id: { not: exceptId } } : {}) } });
+    const dup = await this.db.user.count({ where: { username, ...(exceptId ? { id: { not: exceptId } } : {}) } });
     if (dup) throw new ConflictException('Username sudah dipakai.');
   }
 
   private async ensureRole(roleId: number | null | undefined) {
     if (!roleId) throw new BadRequestException('Role wajib dipilih.');
-    if (!(await this.prisma.role.count({ where: { id: roleId } }))) throw new BadRequestException('Role tidak ditemukan.');
+    if (!(await this.db.role.count({ where: { id: roleId } }))) throw new BadRequestException('Role tidak ditemukan.');
   }
 
   async create(dto: CreateUserDto): Promise<UserRow> {
     const username = dto.username.trim();
     await this.ensureUniqueUsername(username);
     await this.ensureRole(dto.roleId);
-    const u = await this.prisma.user.create({
+    const u = await this.db.user.create({
       data: {
         fullname: dto.fullname.trim(), username, email: dto.email?.trim() || '', roleId: dto.roleId!, isActive: dto.isActive ?? true,
         lastLogin: GX_EMPTY_DATE, ...(await hashPassword(dto.password)),
@@ -87,17 +95,20 @@ export class UsersService {
     }
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (dto.password) Object.assign(data, await hashPassword(dto.password));
-    const u = await this.prisma.user.update({ where: { id }, data, include: { role: true } });
+    const u = await this.db.user.update({ where: { id }, data, include: { role: true } });
     return toRow(u);
   }
 
   async remove(id: number, currentUserId: number) {
     if (id === currentUserId) throw new BadRequestException('Tidak bisa menghapus akun sendiri.');
+    if (this.prisma.activeProfile.usersWritable) {
+      throw new BadRequestException(`Di database ${this.prisma.activeProfile.label} user tidak bisa dihapus. Nonaktifkan saja user ini.`);
+    }
     await this.get(id);
     try {
-      await this.prisma.$transaction([
-        this.prisma.userCookie.deleteMany({ where: { userId: id } }),
-        this.prisma.user.delete({ where: { id } }),
+      await this.db.$transaction([
+        this.db.userCookie.deleteMany({ where: { userId: id } }),
+        this.db.user.delete({ where: { id } }),
       ]);
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {

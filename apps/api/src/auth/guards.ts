@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { canEdit, canView } from '@sml/shared';
-import { ALLOW_ON_READ_ONLY, IS_PUBLIC, MENU_ACCESS, type MenuAccessMeta } from '../common/decorators.js';
+import { ALLOW_ON_READ_ONLY, ALLOW_USERS_WRITE, IS_PUBLIC, MENU_ACCESS, type MenuAccessMeta } from '../common/decorators.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthService } from './auth.service.js';
 import type { AuthUser } from './auth.types.js';
@@ -36,6 +36,7 @@ export class ReadOnlyGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return true;
     if (this.reflector.getAllAndOverride<boolean>(ALLOW_ON_READ_ONLY, [ctx.getHandler(), ctx.getClass()])) return true;
+    if (this.prisma.activeProfile.usersWritable && this.reflector.getAllAndOverride<boolean>(ALLOW_USERS_WRITE, [ctx.getHandler(), ctx.getClass()])) return true;
     throw new ForbiddenException(`Database ${this.prisma.activeProfile.label} dibuka khusus baca. Perubahan tidak bisa disimpan.`);
   }
 }
