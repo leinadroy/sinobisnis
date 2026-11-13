@@ -6,6 +6,7 @@
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Domain,
+  [string]$Nssm = "nssm.exe",
   [string]$Node = "C:\Program Files\nodejs\node.exe",
   [int]$ApiPort = 4000,
   [int]$WebPort = 3001,
@@ -16,31 +17,31 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $logs = Join-Path $root "logs"
 New-Item -ItemType Directory -Force $logs | Out-Null
 
-if (-not (Get-Command nssm.exe -ErrorAction SilentlyContinue)) { throw "nssm.exe tidak ditemukan di PATH." }
+if (-not (Get-Command $Nssm -ErrorAction SilentlyContinue)) { throw "nssm.exe tidak ditemukan di $Nssm." }
 if (-not (Test-Path $Node)) { throw "Node.js tidak ditemukan di $Node (pakai -Node <path>)." }
 if (-not (Test-Path (Join-Path $root "apps\api\dist\main.js"))) { throw "Belum di-build: jalankan npm run build dulu." }
 if (-not (Test-Path (Join-Path $root "apps\api\.env"))) { throw "apps\api\.env belum dibuat (lihat langkah 5)." }
 
 function Install-SmlService([string]$Name, [string]$Dir, [string[]]$AppArgs, [string[]]$EnvVars, [string]$Log, [string]$DependsOn) {
   if (Get-Service $Name -ErrorAction SilentlyContinue) {
-    nssm stop $Name | Out-Null
+    & $Nssm stop $Name | Out-Null
   } else {
-    nssm install $Name $Node | Out-Null
+    & $Nssm install $Name $Node | Out-Null
   }
-  nssm set $Name Application $Node | Out-Null
-  nssm set $Name AppParameters ($AppArgs -join " ") | Out-Null
-  nssm set $Name AppDirectory $Dir | Out-Null
-  nssm set $Name AppEnvironmentExtra @EnvVars | Out-Null
-  nssm set $Name AppStdout $Log | Out-Null
-  nssm set $Name AppStderr $Log | Out-Null
-  nssm set $Name AppRotateFiles 1 | Out-Null
-  nssm set $Name AppRotateOnline 1 | Out-Null
-  nssm set $Name AppRotateBytes 10485760 | Out-Null
-  nssm set $Name Start SERVICE_AUTO_START | Out-Null
-  nssm set $Name AppExit Default Restart | Out-Null
-  nssm set $Name AppRestartDelay 5000 | Out-Null
-  if ($DependsOn) { nssm set $Name DependOnService $DependsOn | Out-Null }
-  nssm start $Name | Out-Null
+  & $Nssm set $Name Application $Node | Out-Null
+  & $Nssm set $Name AppParameters ($AppArgs -join " ") | Out-Null
+  & $Nssm set $Name AppDirectory $Dir | Out-Null
+  & $Nssm set $Name AppEnvironmentExtra @EnvVars | Out-Null
+  & $Nssm set $Name AppStdout $Log | Out-Null
+  & $Nssm set $Name AppStderr $Log | Out-Null
+  & $Nssm set $Name AppRotateFiles 1 | Out-Null
+  & $Nssm set $Name AppRotateOnline 1 | Out-Null
+  & $Nssm set $Name AppRotateBytes 10485760 | Out-Null
+  & $Nssm set $Name Start SERVICE_AUTO_START | Out-Null
+  & $Nssm set $Name AppExit Default Restart | Out-Null
+  & $Nssm set $Name AppRestartDelay 5000 | Out-Null
+  if ($DependsOn) { & $Nssm set $Name DependOnService $DependsOn | Out-Null }
+  & $Nssm start $Name | Out-Null
   Write-Host "Service $Name berjalan ($Dir)."
 }
 
