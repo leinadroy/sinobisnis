@@ -37,8 +37,11 @@ export class PdfError extends Error {
   }
 }
 
-/** Render halaman cetak invoice ke PDF A4 dengan sesi login user yang sama. */
-export async function renderInvoicePdf(invoiceId: number, token: string): Promise<Uint8Array> {
+/**
+ * Render halaman cetak (`path`, mis. /print/invoices/12) ke PDF dengan sesi login user yang sama.
+ * Ukuran kertas mengikuti @page di CSS halaman; `readySelector` = elemen yang menandakan halaman sudah lengkap.
+ */
+export async function renderPrintPdf(path: string, token: string, readySelector: string, notFound = "Data tidak ditemukan."): Promise<Uint8Array> {
   const executablePath = findBrowser();
   if (!executablePath) throw new PdfError("Chrome/Edge tidak ditemukan di server. Isi PDF_BROWSER_PATH di .env web.", 503);
   const origin = renderOrigin();
@@ -47,21 +50,26 @@ export async function renderInvoicePdf(invoiceId: number, token: string): Promis
     await browser.setCookie({ name: TOKEN_COOKIE, value: token, domain: new URL(origin).hostname, path: "/", httpOnly: true });
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 1800 });
-    const url = `${origin}/print/invoices/${invoiceId}`;
+    const url = `${origin}${path}`;
     let res = await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
     // Gangguan sesaat (mis. halaman baru dikompilasi server development, atau API sedang restart): coba sekali lagi.
     if (!res || res.status() >= 500) {
       await new Promise((r) => setTimeout(r, 1500));
       res = await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
     }
-    if (!res || !res.ok()) throw new PdfError(res?.status() === 404 ? "Invoice tidak ditemukan." : `Halaman cetak gagal dimuat (${res?.status() ?? "tanpa respons"}).`, res?.status() === 404 ? 404 : 502);
+    if (!res || !res.ok()) throw new PdfError(res?.status() === 404 ? notFound : `Halaman cetak gagal dimuat (${res?.status() ?? "tanpa respons"}).`, res?.status() === 404 ? 404 : 502);
     if (new URL(page.url()).pathname.startsWith("/login")) throw new PdfError("Sesi login habis. Silakan login ulang.", 401);
-    await page.waitForSelector(".invoice-print .page", { timeout: 15_000 });
+    await page.waitForSelector(readySelector, { timeout: 15_000 });
     await page.evaluate(() => document.fonts.ready);
     return await page.pdf({ preferCSSPageSize: true, printBackground: true });
   } finally {
     await browser.close().catch(() => undefined);
   }
+}
+
+/** Render halaman cetak invoice ke PDF A4 dengan sesi login user yang sama. */
+export function renderInvoicePdf(invoiceId: number, token: string): Promise<Uint8Array> {
+  return renderPrintPdf(`/print/invoices/${invoiceId}`, token, ".invoice-print .page", "Invoice tidak ditemukan.");
 }
 
 export interface PdfAttachment {
