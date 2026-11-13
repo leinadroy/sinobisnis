@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { REMINDER_TYPES, type ReminderOverview, type ReminderType } from '@sml/shared';
+import { REMINDER_TYPES, todayStr, type ReminderOverview, type ReminderPrintData, type ReminderType } from '@sml/shared';
 import { CurrentUser, Menu } from '../common/decorators.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { ReminderScheduler } from './reminder-scheduler.service.js';
@@ -30,6 +30,12 @@ export class RemindersController {
   @Get('items')
   async items(@Query() q: ReminderItemsQueryDto) {
     return (await this.reminders.items())[q.type];
+  }
+
+  /** Semua kategori sekaligus untuk cetak / PDF daftar reminder hari ini. */
+  @Get('items/all')
+  async allItems(): Promise<ReminderPrintData> {
+    return { date: todayStr(), items: await this.reminders.items() };
   }
 
   @Get('logs')
