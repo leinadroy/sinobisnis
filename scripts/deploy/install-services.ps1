@@ -8,7 +8,8 @@ param(
   [Parameter(Mandatory = $true)][string]$Domain,
   [string]$Node = "C:\Program Files\nodejs\node.exe",
   [int]$ApiPort = 4000,
-  [int]$WebPort = 3001
+  [int]$WebPort = 3001,
+  [string]$WebBind = "127.0.0.1"
 )
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -44,24 +45,24 @@ function Install-SmlService([string]$Name, [string]$Dir, [string[]]$AppArgs, [st
 }
 
 Install-SmlService -Name "SinobisnisAPI" -Dir (Join-Path $root "apps\api") -AppArgs @("dist\main.js") `
-  -EnvVars @("NODE_ENV=production", "HOST=127.0.0.1", "PORT=$ApiPort", "WEB_ORIGIN=$Domain", "TZ=Asia/Jakarta") `
+  -EnvVars @("NODE_ENV=production", "HOST=localhost", "PORT=$ApiPort", "WEB_ORIGIN=$Domain", "TZ=Asia/Jakarta") `
   -Log (Join-Path $logs "api.log")
 
-$webEnv = @("NODE_ENV=production", "PORT=$WebPort", "API_URL=http://127.0.0.1:$ApiPort/api", "PDF_RENDER_ORIGIN=http://127.0.0.1:$WebPort", "TZ=Asia/Jakarta")
+$webEnv = @("NODE_ENV=production", "PORT=$WebPort", "API_URL=http://localhost:$ApiPort/api", "PDF_RENDER_ORIGIN=http://localhost:$WebPort", "TZ=Asia/Jakarta")
 # Uji coba tanpa HTTPS: cookie login harus boleh lewat http, kalau tidak login selalu gagal.
 if ($Domain -like "http://*") { $webEnv += "COOKIE_SECURE=0" }
 
 Install-SmlService -Name "SinobisnisWeb" -Dir (Join-Path $root "apps\web") `
-  -AppArgs @("node_modules\next\dist\bin\next", "start", "-p", "$WebPort", "-H", "127.0.0.1") `
+  -AppArgs @("node_modules\next\dist\bin\next", "start", "-p", "$WebPort", "-H", "$WebBind") `
   -EnvVars $webEnv `
   -Log (Join-Path $logs "web.log") -DependsOn "SinobisnisAPI"
 
 Start-Sleep -Seconds 8
 try {
-  $h = Invoke-RestMethod "http://127.0.0.1:$ApiPort/api/health" -TimeoutSec 10
+  $h = Invoke-RestMethod "http://localhost:$ApiPort/api/health" -TimeoutSec 10
   Write-Host "API health: $($h | ConvertTo-Json -Compress)"
 } catch { Write-Warning "API belum menjawab; cek $logs\api.log" }
 try {
-  $w = Invoke-WebRequest "http://127.0.0.1:$WebPort/login" -UseBasicParsing -TimeoutSec 20
+  $w = Invoke-WebRequest "http://localhost:$WebPort/login" -UseBasicParsing -TimeoutSec 20
   Write-Host "Web: HTTP $($w.StatusCode)"
 } catch { Write-Warning "Web belum menjawab; cek $logs\web.log" }
