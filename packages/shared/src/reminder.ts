@@ -63,6 +63,12 @@ export interface ReminderSchedule {
   error: string | null;
 }
 
+/** Data cetak / PDF daftar reminder: semua kategori untuk satu tanggal ('YYYY-MM-DD'). */
+export interface ReminderPrintData {
+  date: string;
+  items: Record<ReminderType, ReminderItem[]>;
+}
+
 export interface ReminderOverview {
   counts: Record<ReminderType, number>;
   schedule: ReminderSchedule;

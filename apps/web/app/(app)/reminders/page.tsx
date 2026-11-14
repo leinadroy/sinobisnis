@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { canView, REMINDER_TYPES, type ReminderItem, type ReminderLogList, type ReminderOverview, type ReminderType } from "@sml/shared";
+import { Printer } from "lucide-react";
 import { Forbidden, PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { listQuery } from "@/lib/list-params";
 import { getAccess } from "@/lib/session";
@@ -35,7 +37,17 @@ export default async function RemindersPage({ searchParams }: PageProps<"/remind
       {tab === "log" ? (
         <Suspense><ReminderLogTable list={logs!} /></Suspense>
       ) : (
-        <ReminderItemsTable type={tab as ReminderType} items={items} />
+        <>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" size="sm" nativeButton={false} render={<a href={`/print/reminders?type=${tab}`} target="_blank" rel="noopener" />}>
+              <Printer /> Print / PDF kategori ini
+            </Button>
+            <Button variant="outline" size="sm" nativeButton={false} render={<a href="/print/reminders" target="_blank" rel="noopener" />}>
+              <Printer /> Print / PDF semua kategori
+            </Button>
+          </div>
+          <ReminderItemsTable type={tab as ReminderType} items={items} />
+        </>
       )}
     </div>
   );
