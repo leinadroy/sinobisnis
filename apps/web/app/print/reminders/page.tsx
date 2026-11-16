@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { REMINDER_DAY_LABELS, REMINDER_LABELS, REMINDER_TYPES, type ReminderItem, type ReminderPrintData, type ReminderType } from "@sml/shared";
+import { isReminderDate, REMINDER_DAY_LABELS, REMINDER_LABELS, REMINDER_TYPES, todayStr, type ReminderItem, type ReminderPrintData, type ReminderType } from "@sml/shared";
 import { Forbidden } from "@/components/page-header";
 import { apiFetch } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -80,13 +80,14 @@ export default async function PrintRemindersPage({ searchParams }: PageProps<"/p
   if (!view) return <div className="p-6"><Forbidden /></div>;
   const sp = await searchParams;
   const only = isType(sp.type) ? sp.type : null;
-  const data = await apiFetch<ReminderPrintData>("/reminders/items/all");
+  const date = isReminderDate(sp.date) ? sp.date : todayStr();
+  const data = await apiFetch<ReminderPrintData>(`/reminders/items/all?date=${date}`);
   const types = only ? [only] : [...REMINDER_TYPES];
   const total = types.reduce((n, t) => n + data.items[t].length, 0);
 
   return (
     <div className="reminder-print">
-      <ReminderPrintToolbar type={only} />
+      <ReminderPrintToolbar type={only} date={date} />
       <div className="page">
         <header>
           <h1>Daftar Email Reminder{only ? ` — ${REMINDER_LABELS[only]}` : ""}</h1>

@@ -15,6 +15,11 @@ export class TestEmailDto {
 
 export class ReminderItemsQueryDto {
   @IsIn(REMINDER_TYPES) type: ReminderType;
+  @IsOptional() @IsString() date?: string;
+}
+
+export class ReminderDateQueryDto {
+  @IsOptional() @IsString() date?: string;
 }
 
 export class ReminderLogQueryDto extends ListQueryDto {

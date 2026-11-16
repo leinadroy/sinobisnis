@@ -7,6 +7,13 @@ import type { Paginated } from './types.js';
 export const REMINDER_TYPES = ['EXPIRED_2', 'EXPIRED_1', 'INVOICE_CREATE', 'INVOICE_PAY', 'EPO'] as const;
 export type ReminderType = (typeof REMINDER_TYPES)[number];
 
+/** Tanggal kalender yang valid dalam format YYYY-MM-DD. */
+export function isReminderDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 export const REMINDER_LABELS: Record<ReminderType, string> = {
   EXPIRED_2: 'Reminder ke-2 expired',
   EXPIRED_1: 'Dokumen akan expired',

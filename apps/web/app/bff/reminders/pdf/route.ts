@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { REMINDER_TYPES, todayStr } from "@sml/shared";
+import { isReminderDate, REMINDER_TYPES, todayStr } from "@sml/shared";
 import { TOKEN_COOKIE } from "@/lib/api";
 import { PdfError, renderPrintPdf } from "@/lib/invoice-pdf";
 
@@ -13,11 +13,13 @@ export const maxDuration = 300;
 export async function GET(req: Request) {
   const token = (await cookies()).get(TOKEN_COOKIE)?.value;
   if (!token) return Response.json({ message: "Belum login." }, { status: 401 });
-  const raw = new URL(req.url).searchParams.get("type");
+  const query = new URL(req.url).searchParams;
+  const raw = query.get("type");
   const type = raw && (REMINDER_TYPES as readonly string[]).includes(raw) ? raw : null;
+  const date = isReminderDate(query.get("date")) ? query.get("date")! : todayStr();
   try {
-    const bytes = await renderPrintPdf(`/print/reminders${type ? `?type=${type}` : ""}`, token, ".reminder-print .page");
-    const name = `Reminder-${todayStr()}${type ? `-${type}` : ""}.pdf`;
+    const bytes = await renderPrintPdf(`/print/reminders?date=${date}${type ? `&type=${type}` : ""}`, token, ".reminder-print .page");
+    const name = `Reminder-${date}${type ? `-${type}` : ""}.pdf`;
     return new Response(Buffer.from(bytes), {
       headers: { "Content-Type": "application/pdf", "Cache-Control": "no-store", "Content-Disposition": `inline; filename="${name}"` },
     });

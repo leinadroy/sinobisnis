@@ -108,7 +108,7 @@ export function ReminderStatus({ overview, canRun, canConfigure }: { overview: R
   );
 }
 
-export function ReminderTabs({ overview, tab }: { overview: ReminderOverview; tab: string }) {
+export function ReminderTabs({ overview, tab, date }: { overview: ReminderOverview; tab: string; date: string | null }) {
   const cls = (on: boolean) => cn(
     "inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
     on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground",
@@ -116,12 +116,12 @@ export function ReminderTabs({ overview, tab }: { overview: ReminderOverview; ta
   return (
     <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Kategori reminder">
       {REMINDER_TYPES.map((t) => (
-        <Link key={t} href={`/reminders?tab=${t}`} className={cls(tab === t)} aria-current={tab === t ? "page" : undefined}>
+        <Link key={t} href={`/reminders?tab=${t}${date ? `&date=${date}` : ""}`} className={cls(tab === t)} aria-current={tab === t ? "page" : undefined}>
           {REMINDER_LABELS[t]}
           <span className={cn("rounded-full px-1.5 text-xs tabular-nums", tab === t ? "bg-primary-foreground/20" : overview.counts[t] ? "bg-amber-200 text-amber-900" : "bg-background")}>{overview.counts[t]}</span>
         </Link>
       ))}
-      <Link href="/reminders?tab=log" className={cls(tab === "log")} aria-current={tab === "log" ? "page" : undefined}><Bell className="size-3.5" /> Notification Log</Link>
+      <Link href={`/reminders?tab=log${date ? `&date=${date}` : ""}`} className={cls(tab === "log")} aria-current={tab === "log" ? "page" : undefined}><Bell className="size-3.5" /> Notification Log</Link>
     </nav>
   );
 }

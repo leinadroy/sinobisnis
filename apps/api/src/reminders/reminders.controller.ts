@@ -1,10 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { REMINDER_TYPES, todayStr, type ReminderOverview, type ReminderPrintData, type ReminderType } from '@sml/shared';
+import { isReminderDate, REMINDER_TYPES, todayStr, type ReminderOverview, type ReminderPrintData, type ReminderType } from '@sml/shared';
 import { CurrentUser, Menu } from '../common/decorators.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import { ReminderScheduler } from './reminder-scheduler.service.js';
-import { CreateSystemConfigDto, ReminderItemsQueryDto, ReminderLogQueryDto, RunReminderDto, SystemConfigValueDto, TestEmailDto } from './reminders.dto.js';
+import { CreateSystemConfigDto, ReminderDateQueryDto, ReminderItemsQueryDto, ReminderLogQueryDto, RunReminderDto, SystemConfigValueDto, TestEmailDto } from './reminders.dto.js';
 import { RemindersService } from './reminders.service.js';
 import { SystemConfigService } from './system-config.service.js';
 
@@ -15,10 +15,16 @@ import { SystemConfigService } from './system-config.service.js';
 export class RemindersController {
   constructor(private readonly reminders: RemindersService, private readonly scheduler: ReminderScheduler) {}
 
+  private date(value?: string): string {
+    if (value === undefined) return todayStr();
+    if (!isReminderDate(value)) throw new BadRequestException('Tanggal harus valid dengan format YYYY-MM-DD.');
+    return value;
+  }
+
   /** Jumlah per kategori, status jadwal, dan kesiapan SMTP/penerima. */
   @Get()
-  async overview(): Promise<ReminderOverview> {
-    const [items, cfg, recipients] = await Promise.all([this.reminders.items(), this.reminders.config(), this.reminders.recipientCounts()]);
+  async overview(@Query() q: ReminderDateQueryDto): Promise<ReminderOverview> {
+    const [items, cfg, recipients] = await Promise.all([this.reminders.items(this.date(q.date)), this.reminders.config(), this.reminders.recipientCounts()]);
     return {
       counts: Object.fromEntries(REMINDER_TYPES.map((t) => [t, items[t].length])) as Record<ReminderType, number>,
       schedule: this.scheduler.status(),
@@ -29,13 +35,14 @@ export class RemindersController {
 
   @Get('items')
   async items(@Query() q: ReminderItemsQueryDto) {
-    return (await this.reminders.items())[q.type];
+    return (await this.reminders.items(this.date(q.date)))[q.type];
   }
 
   /** Semua kategori sekaligus untuk cetak / PDF daftar reminder hari ini. */
   @Get('items/all')
-  async allItems(): Promise<ReminderPrintData> {
-    return { date: todayStr(), items: await this.reminders.items() };
+  async allItems(@Query() q: ReminderDateQueryDto): Promise<ReminderPrintData> {
+    const date = this.date(q.date);
+    return { date, items: await this.reminders.items(date) };
   }
 
   @Get('logs')
