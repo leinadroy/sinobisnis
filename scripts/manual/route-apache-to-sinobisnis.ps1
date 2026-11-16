@@ -12,6 +12,13 @@ $include = 'Include "conf/extra/sinobisnis-proxy.conf"'
 
 if (-not (Test-Path $httpd) -or -not (Test-Path $main)) { throw 'Apache XAMPP tidak ditemukan.' }
 if (-not (Test-Path (Join-Path $root 'apps\web\.next\BUILD_ID'))) { throw 'Build web belum ada.' }
+$apiEnv = Join-Path $root 'apps\api\.env'
+$dbState = Join-Path $root 'apps\api\config\db-profile.json'
+if (-not (Test-Path $apiEnv) -or -not (Test-Path $dbState)) { throw 'Konfigurasi production API belum siap.' }
+$apiSettings = [IO.File]::ReadAllText($apiEnv)
+if ($apiSettings -notmatch '(?m)^DB_PROFILES=production\s*$' -or $apiSettings -notmatch '(?m)^DB_READONLY_PRODUCTION=0\s*$' -or (Get-Content $dbState -Raw | ConvertFrom-Json).active -ne 'production') {
+  throw 'API belum diaktifkan untuk production; Apache tidak diubah.'
+}
 if ((Get-Service Apache2.4).Status -ne 'Running') { throw 'Apache2.4 harus Running.' }
 if ((Get-Service Tomcat9).Status -ne 'Stopped') { throw 'Tomcat9 masih berjalan.' }
 if (Test-Path $extra) { throw 'Konfigurasi proxy Sinobisnis sudah ada; tidak ditimpa.' }
@@ -29,6 +36,10 @@ foreach ($url in 'http://127.0.0.1:3001/login','http://127.0.0.1:4000/api/health
 $cert = Join-Path $apache 'conf\ssl.crt\server.crt'
 $key = Join-Path $apache 'conf\ssl.key\server.key'
 if (-not (Test-Path $cert) -or -not (Test-Path $key)) { throw 'Berkas TLS Apache yang aktif tidak ditemukan.' }
+$publicCert = [Security.Cryptography.X509Certificates.X509Certificate2]::new($cert)
+if ($publicCert.NotAfter -le (Get-Date) -or $publicCert.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::DnsName, $false) -ne 'smlgroupid.com') {
+  throw 'Sertifikat Apache belum valid untuk smlgroupid.com. Routing 80/443 tidak diubah.'
+}
 
 New-Item -ItemType Directory -Path $backup -Force | Out-Null
 & icacls.exe $backup /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Null
