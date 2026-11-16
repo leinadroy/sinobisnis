@@ -74,6 +74,7 @@ try {
   Start-Sleep -Seconds 3
   $changed = $true
   [IO.File]::WriteAllLines($envFile, $output, [Text.UTF8Encoding]::new($false))
+  [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($stateFile)) | Out-Null
   $newState = @{ active='production'; at=(Get-Date).ToString('o'); by='manual-cutover'; from='staging' } | ConvertTo-Json
   [IO.File]::WriteAllText($stateFile, $newState, [Text.UTF8Encoding]::new($false))
   Start-ScheduledTask -TaskName SinobisnisAPI -ErrorAction Stop
