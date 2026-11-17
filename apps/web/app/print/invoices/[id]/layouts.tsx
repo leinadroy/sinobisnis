@@ -66,7 +66,8 @@ export function SmlInvoice({ data }: { data: InvoicePrintData }) {
   return (
     <div className="page sml">
       <img className="logo" src="/logo-sinobisnis.png" width={1342} height={267} alt={company?.name ?? "Sinobisnis"} />
-      <div className="banner">INVOICE</div>
+      {/* Banner = gambar asli dari cetakan lama (SML-Invoice.pdf), supaya font & ukurannya sama persis. */}
+      <div className="banner"><img src="/print/sml/invoice-banner.png" width={505} height={117} alt="INVOICE" /></div>
 
       <table className="meta">
         <tbody>
