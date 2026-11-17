@@ -94,7 +94,9 @@ export function KontrakForm({ id, options, canEdit, initial }: Props) {
                 <Input aria-label="Duration" maxLength={100} value={i.duration} onChange={(e) => setItem(i.key, { duration: e.target.value })} placeholder="mis. 12 bulan" />
                 <Input aria-label="Price" inputMode="decimal" value={i.price} onChange={(e) => setItem(i.key, { price: e.target.value })} />
                 {canEdit ? (
-                  <Button variant="ghost" size="icon-sm" aria-label="Hapus item" className="justify-self-end text-destructive" onClick={() => setItems((xs) => xs.filter((x) => x.key !== i.key))}><X /></Button>
+                  <ConfirmDelete title="Hapus harga Keperluan ini?" description="Baris harga ini dihapus dari kontrak (berlaku setelah Save)."
+                    trigger={<Button variant="ghost" size="icon-sm" aria-label="Hapus item" className="justify-self-end text-destructive" />}
+                    onConfirm={() => setItems((xs) => xs.filter((x) => x.key !== i.key))}><X /></ConfirmDelete>
                 ) : <span />}
               </div>
             ))}
