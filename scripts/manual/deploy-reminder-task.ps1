@@ -1,4 +1,4 @@
-# Deploy API reminder trigger and pending web fixes, then redirect the existing 07:00 task.
+# Deploy all current API/web changes and configure the existing 07:00 reminder task.
 # Does not send email during deployment. Run elevated on the VM after git pull.
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -27,8 +27,12 @@ foreach ($name in $serviceTasks) {
 }
 $oldTask = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
 $oldActions = @($oldTask.Actions)
-if ($oldActions.Count -ne 1 -or $oldActions[0].Execute -notlike '*sinobisnis-schedule-20240823.bat*') {
-  throw 'Action task lama tidak sesuai dengan BAT yang diperiksa; task tidak diubah.'
+if ($oldActions.Count -ne 1) { throw 'Task reminder memiliki lebih dari satu action; task tidak diubah.' }
+$oldExecute = $oldActions[0].Execute.Trim('"')
+$legacyAction = $oldExecute -like '*sinobisnis-schedule-20240823.bat*'
+$currentAction = [IO.Path]::GetFullPath($oldExecute) -eq [IO.Path]::GetFullPath($bat)
+if (-not $legacyAction -and -not $currentAction) {
+  throw 'Action task reminder tidak dikenal; task tidak diubah.'
 }
 $wasDisabled = $oldTask.State -eq 'Disabled'
 $dailyAtSeven = @($oldTask.Triggers | Where-Object {
@@ -102,9 +106,11 @@ try {
   $location = (& curl.exe -sS -o NUL -w '%{redirect_url}' --max-time 10 --resolve 'smlgroupid.com:8443:127.0.0.1' -b 'sml_token=check' -X POST 'https://smlgroupid.com:8443/logout' 2>&1 | Out-String).Trim()
   if ($LASTEXITCODE -ne 0 -or $location -ne 'https://smlgroupid.com/login') { throw "Redirect logout belum sesuai: $location" }
 
-  $newAction = New-ScheduledTaskAction -Execute $bat -WorkingDirectory $root
-  Set-ScheduledTask -TaskName $taskName -Action $newAction -ErrorAction Stop | Out-Null
-  $taskChanged = $true
+  if (-not $currentAction) {
+    $newAction = New-ScheduledTaskAction -Execute $bat -WorkingDirectory $root
+    Set-ScheduledTask -TaskName $taskName -Action $newAction -ErrorAction Stop | Out-Null
+    $taskChanged = $true
+  }
   Enable-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null
   $installed = Get-ScheduledTask -TaskName $taskName
   if ($installed.Actions[0].Execute -ne $bat -or $installed.State -eq 'Disabled') { throw 'Action task belum terpasang.' }
