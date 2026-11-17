@@ -92,8 +92,10 @@ try {
 
   foreach ($package in $packages) {
     $folder = Join-Path $root $package
-    & $npm --prefix $folder ci --prefer-offline --no-audit --no-fund
+    # VM bisa memiliki NODE_ENV=production; compiler ada di devDependencies.
+    & $npm --prefix $folder ci --include=dev --prefer-offline --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw "npm ci gagal: $package" }
+    if (-not (Test-Path (Join-Path $folder 'node_modules\.bin\tsc.cmd'))) { throw "TypeScript tidak terpasang: $package" }
     & $npm --prefix $folder run build
     if ($LASTEXITCODE -ne 0) { throw "Build gagal: $package" }
   }
