@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { masterEntity, type MasterOptions, type Paginated } from '@sml/shared';
+import { masterEntity, periodUnit, type MasterOptions, type Paginated } from '@sml/shared';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ListQueryDto, paginated } from '../common/list-query.dto.js';
@@ -187,7 +187,7 @@ export class MasterService {
       bankAccounts: banks.map((b) => ({ id: b.id, label: `${b.bankName} _ ${b.accountNo}` })),
       projects: projects.map((p) => ({ id: p.id, name: p.name, sponsorId: p.sponsorId, companyName: p.companyName || null, billToId: matchBillTo(p, billTos, usage) })),
       keperluan: keperluan.map((k) => ({
-        id: k.id, name: k.name, periode: k.periode ?? 0, periodeIn: k.periodeIn?.trim() || 'MONTHS',
+        id: k.id, name: k.name, periode: k.periode ?? 0, periodeIn: periodUnit(k.periode, k.periodeIn),
         sumberData: k.sumberData?.trim() || 'TANGGAL TERBIT DOKUMEN', isActive: k.isActive,
       })),
       taxes: taxes.map((t) => ({ id: t.id, name: t.name, percentage: t.percentage, type: t.additionReduction })),

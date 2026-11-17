@@ -124,6 +124,16 @@ export interface ClientFilter {
   unpaid?: boolean;
 }
 
+/**
+ * Satuan periode Keperluan. Data lama banyak yang Periode In-nya kosong (NULL) atau berakhiran tab ("DAYS\t");
+ * bila kosong: periode ≥ 30 = hari (visa 30/60/180 hari), < 30 = bulan (ITAS 2–24 bulan) — pola semua data production.
+ */
+export function periodUnit(periode: number | null | undefined, periodeIn: string | null | undefined): 'DAYS' | 'MONTHS' {
+  const u = (periodeIn ?? '').trim().toUpperCase();
+  if (u === 'DAYS' || u === 'MONTHS') return u;
+  return (periode ?? 0) >= 30 ? 'DAYS' : 'MONTHS';
+}
+
 /** Tambah periode (bulan/hari) ke tanggal 'YYYY-MM-DD' (UTC, tanpa pergeseran zona waktu). */
 export function addPeriod(date: string | null | undefined, n: number, unit: string): string | null {
   if (!date || !n) return null;

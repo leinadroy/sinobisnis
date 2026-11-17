@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
-  CLIENT_DATE_FIELDS, CLIENT_TEXT_FIELDS, computeExpired, todayStr,
+  CLIENT_DATE_FIELDS, CLIENT_TEXT_FIELDS, computeExpired, periodUnit, todayStr,
   type ClientAttachmentRow, type ClientDetail, type ClientHistory, type ClientLogRow, type ClientRow, type Paginated, type PersonRow,
 } from '@sml/shared';
 import { Prisma, type Client } from '../generated/prisma/client.js';
@@ -252,7 +252,7 @@ export class ClientsService {
     const merged = { ...(existing ? toRow(existing) : {}), ...Object.fromEntries(Object.entries(dto).filter(([, v]) => v !== undefined).map(([k, v]) => [k, v === '' ? null : v])) } as Record<string, any>;
     if (!merged.expiredDokumen && merged.keperluanId) {
       const k = await this.prisma.keperluan.findUnique({ where: { id: merged.keperluanId } });
-      const auto = k && computeExpired(merged, { periode: k.periode ?? 0, periodeIn: k.periodeIn?.trim() || 'MONTHS', sumberData: k.sumberData?.trim() || 'TANGGAL TERBIT DOKUMEN' });
+      const auto = k && computeExpired(merged, { periode: k.periode ?? 0, periodeIn: periodUnit(k.periode, k.periodeIn), sumberData: k.sumberData?.trim() || 'TANGGAL TERBIT DOKUMEN' });
       if (auto) data.expiredDokumen = s2d(auto);
     }
     if (merged.projectId && merged.sponsorId) {
