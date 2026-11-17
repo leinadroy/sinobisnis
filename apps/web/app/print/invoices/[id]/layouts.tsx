@@ -65,7 +65,7 @@ export function SmlInvoice({ data }: { data: InvoicePrintData }) {
   const rows = itemRows(inv);
   return (
     <div className="page sml">
-      <img className="logo" src="/logo.svg" alt={company?.name ?? "Sinobisnis"} />
+      <img className="logo" src="/logo-sinobisnis.png" width={1342} height={267} alt={company?.name ?? "Sinobisnis"} />
       <div className="banner">INVOICE</div>
 
       <table className="meta">
