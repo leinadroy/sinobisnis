@@ -216,9 +216,11 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
                 <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
                   <b className="text-sm">No {gi + 1}</b>
                   {editable && (
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setS((x) => ({ ...x, groups: x.groups.filter((y) => y.key !== g.key) }))}>
+                    <ConfirmDelete title={`Hapus grup No ${gi + 1}?`} description="Item layanan dan nama TKA di grup ini ikut dihapus dari invoice (berlaku setelah Save)."
+                      trigger={<Button variant="ghost" size="sm" className="text-destructive" />}
+                      onConfirm={() => setS((x) => ({ ...x, groups: x.groups.filter((y) => y.key !== g.key) }))}>
                       <Trash2 /> Hapus grup
-                    </Button>
+                    </ConfirmDelete>
                   )}
                 </div>
                 <div className="space-y-2 p-3">
@@ -233,8 +235,9 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
                       <Input aria-label="Price Per Pax" inputMode="decimal" value={it.unitPrice} onChange={(e) => setItem(g.key, it.key, { unitPrice: e.target.value })} />
                       <span className="self-center text-right text-sm tabular-nums">{fmtMoney(Math.round(num(it.qty) * num(it.unitPrice) * 100) / 100)}</span>
                       {editable ? (
-                        <Button variant="ghost" size="icon-sm" aria-label="Hapus item" className="justify-self-end text-destructive"
-                          onClick={() => setGroup(g.key, (x) => ({ ...x, items: x.items.filter((y) => y.key !== it.key) }))}><X /></Button>
+                        <ConfirmDelete title={`Hapus item${it.description ? ` "${it.description}"` : ""}?`} description="Item ini dihapus dari grup (berlaku setelah Save)."
+                          trigger={<Button variant="ghost" size="icon-sm" aria-label="Hapus item" className="justify-self-end text-destructive" />}
+                          onConfirm={() => setGroup(g.key, (x) => ({ ...x, items: x.items.filter((y) => y.key !== it.key) }))}><X /></ConfirmDelete>
                       ) : <span />}
                     </div>
                   ))}
@@ -252,8 +255,9 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
                             : <span className="min-w-0 truncate" title="Nama tanpa data client (dari invoice sistem lama)">{c.name} <span className="text-xs text-muted-foreground">(tanpa data client)</span></span>}
                           {c.noPaspor && <span className="text-xs text-muted-foreground">{c.noPaspor}</span>}
                           {editable && (
-                            <Button variant="ghost" size="icon-xs" aria-label={`Keluarkan ${c.name}`} className="ml-auto text-destructive"
-                              onClick={() => setGroup(g.key, (x) => ({ ...x, clients: x.clients.filter((_, i) => i !== ci) }))}><X /></Button>
+                            <ConfirmDelete title={`Keluarkan ${c.name} dari grup?`} description="Nama ini dikeluarkan dari invoice (berlaku setelah Save). Data client-nya tidak dihapus."
+                              trigger={<Button variant="ghost" size="icon-xs" aria-label={`Keluarkan ${c.name}`} className="ml-auto text-destructive" />}
+                              onConfirm={() => setGroup(g.key, (x) => ({ ...x, clients: x.clients.filter((_, i) => i !== ci) }))}><X /></ConfirmDelete>
                           )}
                         </li>
                       ))}
@@ -287,8 +291,9 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
                     <Input aria-label="Value" inputMode="decimal" value={t.value} onChange={(e) => setTax(t.key, { value: e.target.value })} />
                   )}
                   {editable ? (
-                    <Button variant="ghost" size="icon-sm" aria-label="Hapus pajak" className="justify-self-end text-destructive"
-                      onClick={() => setS((x) => ({ ...x, taxes: x.taxes.filter((y) => y.key !== t.key) }))}><X /></Button>
+                    <ConfirmDelete title={`Hapus pajak${master?.name || t.description ? ` "${master?.name ?? t.description}"` : ""}?`} description="Baris pajak ini dihapus dari invoice (berlaku setelah Save)."
+                      trigger={<Button variant="ghost" size="icon-sm" aria-label="Hapus pajak" className="justify-self-end text-destructive" />}
+                      onConfirm={() => setS((x) => ({ ...x, taxes: x.taxes.filter((y) => y.key !== t.key) }))}><X /></ConfirmDelete>
                   ) : <span />}
                 </div>
               );
