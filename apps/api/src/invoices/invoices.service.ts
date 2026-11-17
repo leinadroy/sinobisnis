@@ -472,10 +472,16 @@ export class InvoicesService {
       // Lampiran ikut client: yang baru masuk invoice ditambahkan, yang dikeluarkan dihapus rujukannya.
       const inNow = groups.flatMap((g) => g.clients.map((c) => c.clientId).filter((x): x is number => !!x));
       const dropped = [...members].filter((c) => !unique.has(c));
-      await this.syncClientAttachments(tx, id, inNow.filter((c) => !members.has(c)), dropped);
+      if (!inNow.length) {
+        // Semua client dilepas: hapus hanya rujukan lampiran client. Upload langsung ke invoice tetap ada.
+        // Tidak perlu memindai tabel attachment yang besar untuk mencari id milik tiap client.
+        await tx.invoiceAttachment.deleteMany({ where: { invoiceId: id, attachmentRefId: { not: null } } });
+      } else {
+        await this.syncClientAttachments(tx, id, inNow.filter((c) => !members.has(c)), dropped);
+      }
       // Izin edit hanya berlaku untuk satu kali simpan.
       if (wasApproved) await tx.updateRequest.updateMany({ where: { invoiceId: inv.id, status: 'APPROVED' }, data: { status: 'DONE', updatedDate: s2d(todayStr())! } });
-    });
+    }, { maxWait: 10_000, timeout: 120_000 });
 
     for (const c of removed) await this.clients.log(user.id, c, 'InvoiceRemove');
     for (const c of added) await this.clients.log(user.id, c, 'Invoice');
