@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   /* Sama dengan aplikasi production (smlgroupid.com/sinobisnis): "muli, sans-serif". */
   --font-sans: muli, sans-serif;
-  --font-mono: var(--font-geist-mono);
+  --font-mono: Consolas, "Courier New", monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
