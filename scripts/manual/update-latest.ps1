@@ -6,7 +6,10 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
 if (-not $AfterPull) {
   if ((& git -C $root branch --show-current).Trim() -ne 'main') { throw 'Checkout VM harus berada di branch main.' }
-  if (& git -C $root status --porcelain) { throw 'Ada perubahan lokal di VM; update dihentikan agar tidak tertimpa.' }
+  # File untracked (mis. log lokal) boleh tetap ada; Git sendiri menolak merge jika ada path yang akan tertimpa.
+  if (& git -C $root status --porcelain --untracked-files=no) {
+    throw 'Ada perubahan pada file yang dilacak Git di VM; update dihentikan agar tidak tertimpa.'
+  }
   & git -C $root fetch origin main
   if ($LASTEXITCODE -ne 0) { throw 'Git fetch gagal; layanan belum diubah.' }
   & git -C $root merge --ff-only origin/main
