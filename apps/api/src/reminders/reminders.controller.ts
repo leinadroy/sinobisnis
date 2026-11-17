@@ -1,11 +1,12 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, Post, Put, Query, Req, ServiceUnavailableException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { isReminderDate, REMINDER_TYPES, todayStr, type ReminderOverview, type ReminderPrintData, type ReminderType } from '@sml/shared';
-import { CurrentUser, Menu } from '../common/decorators.js';
+import { CurrentUser, Menu, Public } from '../common/decorators.js';
 import type { AuthUser } from '../auth/auth.types.js';
+import type { Request } from 'express';
 import { ReminderScheduler } from './reminder-scheduler.service.js';
 import { CreateSystemConfigDto, ReminderDateQueryDto, ReminderItemsQueryDto, ReminderLogQueryDto, RunReminderDto, SystemConfigValueDto, TestEmailDto } from './reminders.dto.js';
-import { RemindersService } from './reminders.service.js';
+import { RemindersService, SYSTEM_RUNNER } from './reminders.service.js';
 import { SystemConfigService } from './system-config.service.js';
 
 @ApiTags('reminders')
@@ -14,6 +15,41 @@ import { SystemConfigService } from './system-config.service.js';
 @Controller('reminders')
 export class RemindersController {
   constructor(private readonly reminders: RemindersService, private readonly scheduler: ReminderScheduler) {}
+
+  private localTask(request: Request) {
+    const address = request.socket.remoteAddress;
+    if (address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') {
+      throw new ForbiddenException('Pemicu reminder hanya dapat dipanggil dari VM sendiri.');
+    }
+  }
+
+  /** Pemeriksaan Task Scheduler tanpa mengirim email. */
+  @Public()
+  @Get('run-schedule')
+  async scheduleReady(@Req() request: Request) {
+    this.localTask(request);
+    const [cfg, recipients] = await Promise.all([this.reminders.config(), this.reminders.recipientCounts()]);
+    if (!cfg['SMTP Host']?.trim() || recipients.general + recipients.accounting === 0) {
+      throw new ServiceUnavailableException('SMTP atau Email Recipient aktif belum siap.');
+    }
+    return { status: 'ready', mode: 'windows-task', recipients };
+  }
+
+  /** Pemicu lokal tanpa sesi login; tidak mengirim ulang batch yang sukses hari ini. */
+  @Public()
+  @Post('run-schedule')
+  @HttpCode(200)
+  async runSchedule(@Req() request: Request) {
+    this.localTask(request);
+    if (request.headers['x-sinobisnis-task'] !== '1') {
+      throw new ForbiddenException('Header pemicu Task Scheduler tidak ada.');
+    }
+    const results = await this.reminders.run(false, SYSTEM_RUNNER);
+    if (results.some((r) => r.status === 'FAILED' || r.status === 'NOT SENT')) {
+      throw new ServiceUnavailableException('Sebagian reminder gagal atau tidak terkirim; lihat Notification Log.');
+    }
+    return { status: 'ok', results };
+  }
 
   private date(value?: string): string {
     if (value === undefined) return todayStr();
