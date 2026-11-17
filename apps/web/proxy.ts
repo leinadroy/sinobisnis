@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { publicUrl } from "@/lib/public-url";
 
 // Cek awal saja: tanpa cookie sesi → ke halaman login. Otorisasi sebenarnya dilakukan API di setiap request.
 export function proxy(request: NextRequest) {
   const hasSession = request.cookies.has("sml_token");
   const { pathname, search } = request.nextUrl;
   if (!hasSession && pathname !== "/login" && pathname !== "/login/session") {
-    const url = new URL("/login", request.url);
+    const url = publicUrl("/login", request);
     if (pathname !== "/") url.searchParams.set("next", pathname + search);
     return NextResponse.redirect(url);
   }

@@ -1,6 +1,7 @@
 // Production Next.js server with TLS on port 8443, independent of Apache/Tomcat.
 process.env.NODE_ENV = "production";
 process.env.COOKIE_SECURE = "1";
+process.env.SINOBISNIS_PUBLIC_ORIGIN ||= "https://smlgroupid.com";
 
 const fs = require("node:fs");
 const https = require("node:https");
