@@ -1,5 +1,5 @@
 /* Cetakan invoice A4: model SML, RTS, JCSS (dimodelkan dari SML-/RTS-/JCSS-Invoice.pdf). */
-@page { size: A4; margin: 12mm 12mm 14mm; }
+@page { size: A4; margin: 12mm 12mm 10mm; }
 
 .invoice-print { font-family: Arial, Helvetica, sans-serif; font-size: 11.5px; color: #111; background: #e9ecef; min-height: 100vh; }
 .invoice-print .draft-note { text-align: center; color: #b45309; font-weight: 700; margin-bottom: 4px; }
@@ -46,7 +46,7 @@
 .sml .boxes { display: flex; gap: 18px; margin-top: 22px; page-break-inside: avoid; }
 .sml .box-wrap { flex: 1; }
 .sml .t { margin-bottom: 2px; }
-.sml .box { border: 1px solid #333; background: #fdf8f6; min-height: 120px; padding: 12px 14px; }
+.sml .box { border: 1px solid #333; background: #fdf8f6; min-height: 100px; padding: 12px 14px; }
 .sml .info { white-space: pre-line; font-size: 11px; letter-spacing: .2px; line-height: 1.35; }
 .sml .words { font-weight: 700; font-style: italic; font-size: 13.5px; line-height: 1.35; }
 .sml .pay { margin-top: 20px; page-break-inside: avoid; }
