@@ -103,7 +103,6 @@ export function SmlInvoice({ data }: { data: InvoicePrintData }) {
         </tbody>
       </table>
 
-      <div className="keep">
       <div className="boxes">
         <div className="box-wrap"><div className="t">Important Information</div><div className="box info">{inv.information}</div></div>
         <div className="box-wrap"><div className="t">In Words</div><div className="box words">{words(inv.total)}</div></div>
@@ -116,8 +115,9 @@ export function SmlInvoice({ data }: { data: InvoicePrintData }) {
         </div>
       )}
 
-      <div className="sign-row"><Sign company={company} /></div>
-      {company?.address && <div className="foot">{company.address}</div>}
+      <div className="keep">
+        <div className="sign-row"><Sign company={company} /></div>
+        {company?.address && <div className="foot">{company.address}</div>}
       </div>
     </div>
   );
