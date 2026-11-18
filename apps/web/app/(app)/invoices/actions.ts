@@ -25,6 +25,12 @@ export async function saveInvoice(id: number, input: InvoiceInput) {
   return res;
 }
 
+export async function markInvoicePaid(id: number) {
+  const res = await runAction(() => apiFetch<InvoiceDetail>(`/invoices/${id}/mark-paid`, { method: "POST" }));
+  if (res.ok) refresh(id);
+  return res;
+}
+
 export async function deleteInvoice(id: number) {
   const res = await runAction(() => apiFetch(`/invoices/${id}`, { method: "DELETE" }));
   if (res.ok) refresh();

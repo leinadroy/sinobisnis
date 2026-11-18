@@ -128,6 +128,12 @@ export class InvoicesController {
   }
 
   @Menu('invoices')
+  @Post(':id/mark-paid')
+  markPaid(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
+    return this.invoices.markPaid(id, user);
+  }
+
+  @Menu('invoices')
   @Delete(':id')
   @HttpCode(204)
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {

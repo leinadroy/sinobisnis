@@ -370,6 +370,27 @@ export class InvoicesService {
 
   // ───────────── Simpan ─────────────
 
+  async markPaid(id: number, user: AuthUser): Promise<InvoiceDetail> {
+    const inv = await this.find(id);
+    if (toStatus(inv.status) === 'PAID') throw new ConflictException('Invoice sudah berstatus PAID. Muat ulang halaman.');
+    const paidDate = s2d(todayStr())!;
+    const members = new Set((await this.groups(inv)).flatMap((g) => g.clients.map((c) => c.clientId)).filter((x): x is number => !!x));
+    const owned = await this.ownedClients(inv, members);
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.invoice.updateMany({
+        where: { id: inv.id, status: inv.status },
+        data: { status: 'PAID', paidDate },
+      });
+      if (updated.count !== 1) throw new ConflictException('Status invoice telah berubah. Muat ulang halaman.');
+      if (owned.length) await tx.client.updateMany({
+        where: { no: { in: owned.map(BigInt) }, noInvoice: inv.no?.trim() },
+        data: { tanggalPembayaranInvoice: paidDate },
+      });
+    });
+    for (const clientId of owned) await this.clients.log(user.id, clientId, 'InvoiceUpdate');
+    return this.get(id);
+  }
+
   /**
    * Client yang kolom No Invoice-nya dikelola invoice ini. Bila nomor invoice dipakai lebih dari satu invoice (data lama),
    * hanya client yang tercantum di invoice ini yang dihitung.

@@ -20,6 +20,7 @@ import { ConfirmDelete } from "@/components/confirm-delete";
 import { fmtMoney } from "@/lib/format";
 import { deleteInvoice, fetchPriceList, saveInvoice } from "../actions";
 import { ClientPicker } from "./client-picker";
+import { MarkPaidButton } from "./mark-paid-button";
 import { RequestActions } from "./request-panel";
 
 // Angka disimpan sebagai string selama diketik supaya input kosong / "0," tidak langsung berubah.
@@ -321,6 +322,7 @@ export function InvoiceForm({ detail, options, priceList: initialPrices, canEdit
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 border-t bg-background py-3">
         {editable && <Button onClick={save} disabled={pending}>{pending ? "Menyimpan…" : "Save"}</Button>}
+        {canEdit && detail.status !== "PAID" && <MarkPaidButton id={detail.id} no={detail.no} />}
         <Button variant="outline" nativeButton={false} render={<a href={`/print/invoices/${detail.id}`} target="_blank" rel="noopener" />}><Printer /> Print Invoice</Button>
         {detail.attachments.length > 0 && (
           <Button variant="outline" nativeButton={false} render={<a href={`/bff/invoices/${detail.id}/pdf?attachments=1`} target="_blank" rel="noopener" />}>
