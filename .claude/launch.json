@@ -30,6 +30,28 @@
         "dev"
       ],
       "port": 3001
+    },
+    {
+      "name": "sinobisnis-api-main",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:/VibeCode/Smlgroupid/apps/api",
+        "run",
+        "start:dev"
+      ],
+      "port": 4000
+    },
+    {
+      "name": "sinobisnis-web-main",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:/VibeCode/Smlgroupid/apps/web",
+        "run",
+        "dev"
+      ],
+      "port": 3001
     }
   ]
 }
