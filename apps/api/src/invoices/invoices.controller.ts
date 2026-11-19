@@ -9,7 +9,7 @@ import { canView } from '@sml/shared';
 import { CurrentUser, Menu } from '../common/decorators.js';
 import type { AuthUser } from '../auth/auth.types.js';
 import {
-  CreateInvoiceDto, InvoiceableQueryDto, InvoiceListQueryDto, PriceListQueryDto, RequestEditDto, RequestListQueryDto, SaveInvoiceDto,
+  CreateInvoiceDto, InvoiceableQueryDto, InvoiceListQueryDto, MarkPaidDto, PriceListQueryDto, RequestEditDto, RequestListQueryDto, SaveInvoiceDto,
 } from './invoices.dto.js';
 import { fileDisposition } from '../clients/clients.service.js';
 import { InvoicesService } from './invoices.service.js';
@@ -129,8 +129,8 @@ export class InvoicesController {
 
   @Menu('invoices')
   @Post(':id/mark-paid')
-  markPaid(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
-    return this.invoices.markPaid(id, user);
+  markPaid(@Param('id', ParseIntPipe) id: number, @Body() dto: MarkPaidDto, @CurrentUser() user: AuthUser) {
+    return this.invoices.markPaid(id, dto.paidDate, user);
   }
 
   @Menu('invoices')
