@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CircleCheck } from "lucide-react";
 import { toast } from "sonner";
-import { todayStr } from "@sml/shared";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -22,9 +21,7 @@ export function MarkPaidButton({ id, no }: { id: number; no: string | null }) {
   const [paidDate, setPaidDate] = useState("");
   const [pending, start] = useTransition();
 
-  const today = todayStr();
-  const error = !paidDate ? null : !ISO.test(paidDate) ? "Tanggal tidak valid." : paidDate > today ? "Paid Date tidak boleh setelah hari ini." : null;
-  const valid = ISO.test(paidDate) && !error;
+  const valid = ISO.test(paidDate);
 
   return (
     <AlertDialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setPaidDate(""); }}>
@@ -39,7 +36,7 @@ export function MarkPaidButton({ id, no }: { id: number; no: string | null }) {
         <Field>
           <FieldLabel htmlFor="markPaidDate">Paid Date<span className="text-destructive">*</span></FieldLabel>
           <DateInput id="markPaidDate" value={paidDate} onChange={setPaidDate} disabled={pending} autoFocus />
-          {error ? <FieldDescription className="text-destructive">{error}</FieldDescription> : <FieldDescription>Wajib diisi, format dd/mm/yyyy.</FieldDescription>}
+          <FieldDescription>Format dd/mm/yyyy.</FieldDescription>
         </Field>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>No</AlertDialogCancel>

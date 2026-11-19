@@ -373,7 +373,6 @@ export class InvoicesService {
   async markPaid(id: number, paidDateStr: string, user: AuthUser): Promise<InvoiceDetail> {
     const paidDate = s2d(paidDateStr);
     if (!paidDate || Number.isNaN(paidDate.getTime()) || d2s(paidDate) !== paidDateStr) throw new BadRequestException('Paid Date tidak valid.');
-    if (paidDateStr > todayStr()) throw new BadRequestException('Paid Date tidak boleh setelah hari ini.');
     const inv = await this.find(id);
     if (toStatus(inv.status) === 'PAID') throw new ConflictException('Invoice sudah berstatus PAID. Muat ulang halaman.');
     const members = new Set((await this.groups(inv)).flatMap((g) => g.clients.map((c) => c.clientId)).filter((x): x is number => !!x));
