@@ -57,6 +57,11 @@ export class CreateInvoiceDto {
   @IsOptional() @Nullable() @IsInt() billToId?: number | null;
 }
 
+/** Tombol "Mark as PAID": tanggal pembayaran wajib diisi user. */
+export class MarkPaidDto {
+  @IsNotEmpty({ message: 'Paid Date wajib diisi.' }) @Matches(DATE, { message: 'Paid Date harus berformat YYYY-MM-DD.' }) paidDate: string;
+}
+
 /** Tabel updaterequest lama tidak punya kolom alasan; alasan hanya dicatat di log server. */
 export class RequestEditDto {
   @IsOptional() @IsString() @MaxLength(2000) reason?: string;

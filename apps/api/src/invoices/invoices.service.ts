@@ -370,10 +370,11 @@ export class InvoicesService {
 
   // ───────────── Simpan ─────────────
 
-  async markPaid(id: number, user: AuthUser): Promise<InvoiceDetail> {
+  async markPaid(id: number, paidDateStr: string, user: AuthUser): Promise<InvoiceDetail> {
+    const paidDate = s2d(paidDateStr);
+    if (!paidDate || Number.isNaN(paidDate.getTime()) || d2s(paidDate) !== paidDateStr) throw new BadRequestException('Paid Date tidak valid.');
     const inv = await this.find(id);
     if (toStatus(inv.status) === 'PAID') throw new ConflictException('Invoice sudah berstatus PAID. Muat ulang halaman.');
-    const paidDate = s2d(todayStr())!;
     const members = new Set((await this.groups(inv)).flatMap((g) => g.clients.map((c) => c.clientId)).filter((x): x is number => !!x));
     const owned = await this.ownedClients(inv, members);
     await this.prisma.$transaction(async (tx) => {

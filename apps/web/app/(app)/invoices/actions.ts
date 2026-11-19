@@ -25,8 +25,8 @@ export async function saveInvoice(id: number, input: InvoiceInput) {
   return res;
 }
 
-export async function markInvoicePaid(id: number) {
-  const res = await runAction(() => apiFetch<InvoiceDetail>(`/invoices/${id}/mark-paid`, { method: "POST" }));
+export async function markInvoicePaid(id: number, paidDate: string) {
+  const res = await runAction(() => apiFetch<InvoiceDetail>(`/invoices/${id}/mark-paid`, { method: "POST", json: { paidDate } }));
   if (res.ok) refresh(id);
   return res;
 }
