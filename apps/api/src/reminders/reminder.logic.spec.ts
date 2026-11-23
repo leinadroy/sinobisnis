@@ -1,5 +1,5 @@
 import {
-  addDays, buildBody, buildSubject, byType, categorize, htmlTable, logText, parseLog, recipientsFor, successPrefix,
+  addDays, buildBody, buildSubject, byType, categorize, catchUpDays, htmlTable, logText, parseLog, recipientsFor, successPrefix,
   type KeperluanReminder, type ReminderSource,
 } from './reminder.logic.js';
 
@@ -18,6 +18,33 @@ describe('addDays', () => {
   it('menggeser tanggal melewati bulan/tahun', () => {
     expect(addDays('2026-12-30', 3)).toBe('2027-01-02');
     expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+});
+
+describe('susulan hari ke-N yang terlewat', () => {
+  it('catchUpDays: hari setelah sukses terakhir sampai kemarin, maks. 7; belum pernah = 0', () => {
+    expect(catchUpDays(null, TODAY)).toBe(0);
+    expect(catchUpDays(TODAY, TODAY)).toBe(0);
+    expect(catchUpDays(addDays(TODAY, -1), TODAY)).toBe(0);
+    expect(catchUpDays(addDays(TODAY, -3), TODAY)).toBe(2);
+    expect(catchUpDays(addDays(TODAY, -30), TODAY)).toBe(7);
+  });
+
+  it('client yang hari ke-N-nya terlewat ikut dikirim dengan sisa hari sebenarnya', () => {
+    const hariIni = client({ expiredDokumen: addDays(TODAY, 30) });
+    const kemarin = client({ expiredDokumen: addDays(TODAY, 29) });
+    const duaHariLalu = client({ expiredDokumen: addDays(TODAY, 28) });
+    const k = kep({ reminderExpiredDokumen: 60, reminderExpired2nd: 30 });
+    const tanpaSusulan = byType(categorize([hariIni, kemarin, duaHariLalu], [k], TODAY));
+    expect(ids(tanpaSusulan.EXPIRED_2)).toEqual([hariIni.id]);
+    const susul1 = byType(categorize([hariIni, kemarin, duaHariLalu], [k], TODAY, (t) => (t === 'EXPIRED_2' ? 1 : 0))).EXPIRED_2;
+    expect(susul1.map((x) => [x.id, x.days])).toEqual([[hariIni.id, 30], [kemarin.id, 29]]);
+  });
+
+  it('invoice: kolom Hari = hari sejak tanggal sebenarnya', () => {
+    const telat = client({ tanggalProsesSelesai: addDays(TODAY, -9) });
+    const out = byType(categorize([telat], [kep()], TODAY, () => 2)).INVOICE_CREATE;
+    expect(out.map((x) => [x.id, x.days])).toEqual([[telat.id, 9]]);
   });
 });
 

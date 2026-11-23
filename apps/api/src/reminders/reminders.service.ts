@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { d2s, dt2s, s2d } from '../common/dates.js';
 import { paginated } from '../common/list-query.dto.js';
 import {
-  addDays, buildBody, buildSubject, byType, categorize, daysFor, htmlTable, logText, parseLog, recipientsFor, successPrefix,
+  addDays, buildBody, buildSubject, byType, categorize, catchUpDays, checkDays, daysFor, htmlTable, MAX_CATCH_UP_DAYS, logText, parseLog, recipientsFor, successPrefix,
   type KeperluanReminder, type ReminderBatch, type ReminderSource,
 } from './reminder.logic.js';
 import type { ReminderLogQueryDto } from './reminders.dto.js';
@@ -49,18 +49,44 @@ export class RemindersService {
     });
   }
 
-  /** Batch email (kategori × Keperluan) untuk tanggal `today`. */
+  /**
+   * Tanggal (lokal) kiriman sukses terakhir per "kategori|Keperluan" dalam 8 hari terakhir, dari datalog — termasuk log
+   * aplikasi lama dan log "(0 items)" (hari itu sudah diperiksa).
+   */
+  private async lastSuccess(today: string): Promise<Map<string, string>> {
+    const [yy, mm, dd] = addDays(today, -(MAX_CATCH_UP_DAYS + 1)).split('-').map(Number);
+    const rows = await this.prisma.dataLog.findMany({
+      where: {
+        tableName: REMINDER_LOG_TABLE, created: { gte: new Date(yy, mm - 1, dd) }, description: { startsWith: STATUS_PREFIX.SENT },
+      },
+      select: { created: true, description: true },
+    });
+    const out = new Map<string, string>();
+    for (const r of rows) {
+      const p = parseLog(r.description);
+      if (!p.type || !p.keperluan) continue;
+      const key = `${p.type}|${p.keperluan}`, day = todayStr(r.created);
+      if ((out.get(key) ?? '') < day) out.set(key, day);
+    }
+    return out;
+  }
+
+  /** Batch email (kategori × Keperluan) untuk tanggal `today`, termasuk susulan hari ke-N yang terlewat. */
   async batches(today = todayStr()): Promise<ReminderBatch[]> {
-    const keps = await this.keperluan();
-    // Hanya tanggal yang mungkin cocok (hari ke-N tiap Keperluan) yang diambil dari database.
+    const [keps, last] = await Promise.all([this.keperluan(), this.lastSuccess(today)]);
+    const kepName = new Map(keps.map((k) => [k.id, k.name.trim()]));
+    const back = (t: ReminderType, kepId: number) => catchUpDays(last.get(`${t}|${kepName.get(kepId)}`), today);
+    // Hanya tanggal yang mungkin cocok (hari ke-N tiap Keperluan, plus hari susulan) yang diambil dari database.
     const expired = new Set<string>(), selesai = new Set<string>(), invoice = new Set<string>();
     for (const k of keps) {
       for (const t of REMINDER_TYPES) {
         const n = daysFor(t, k);
         if (n <= 0) continue;
-        if (t === 'INVOICE_CREATE') selesai.add(addDays(today, -n));
-        else if (t === 'INVOICE_PAY') invoice.add(addDays(today, -n));
-        else expired.add(addDays(today, n));
+        for (const d of checkDays(today, back(t, k.id))) {
+          if (t === 'INVOICE_CREATE') selesai.add(addDays(d, -n));
+          else if (t === 'INVOICE_PAY') invoice.add(addDays(d, -n));
+          else expired.add(addDays(d, n));
+        }
       }
     }
     const dates = (s: Set<string>) => [...s].map((d) => s2d(d)!);
@@ -79,7 +105,6 @@ export class RemindersService {
       (projectIds.length ? await this.prisma.sponsorProject.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } }) : [])
         .map((p) => [p.id, p.name]),
     );
-    const kepName = new Map(keps.map((k) => [k.id, k.name.trim()]));
     const text = (s: string | null) => (s?.trim() ? s.trim() : null);
     const sources: ReminderSource[] = rows.map((c) => ({
       id: Number(c.no), name: c.name, noPaspor: text(c.noPaspor), sponsorName: text(c.sponsor),
@@ -89,7 +114,7 @@ export class RemindersService {
       noInvoice: text(c.noInvoice), tanggalInvoice: d2s(c.tanggalInvoice),
       epo: text(c.epo), tanggalPembayaranInvoice: d2s(c.tanggalPembayaranInvoice),
     }));
-    return categorize(sources, keps, today);
+    return categorize(sources, keps, today, back);
   }
 
   async items(today = todayStr()): Promise<Record<ReminderType, ReminderItem[]>> {

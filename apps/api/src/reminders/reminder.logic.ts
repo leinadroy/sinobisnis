@@ -1,6 +1,7 @@
 // Aturan reminder tanpa akses database/SMTP, supaya bisa diuji langsung (reminder.logic.spec.ts).
 // Sama dengan aplikasi lama (dicek terhadap log reminder di datalog): per Keperluan, hanya client yang TEPAT jatuh pada
 // hari ke-N; N diambil dari kolom Reminder di Keperluan dan 0 berarti kategori itu nonaktif untuk Keperluan tersebut.
+// Tambahan aplikasi baru: hari ke-N yang terlewat (server mati / kiriman gagal) disusulkan, lihat catchUpDays.
 import {
   ACCOUNTING_REMINDERS, REMINDER_LOG_PREFIX, REMINDER_TYPES,
   type ReminderItem, type ReminderRunStatus, type ReminderType,
@@ -68,8 +69,26 @@ export interface ReminderBatch {
   items: ReminderItem[];
 }
 
-/** Kelompokkan client per kategori dan Keperluan pada tanggal `today`. Batch tanpa client tidak ikut. */
-export function categorize(rows: ReminderSource[], keperluan: KeperluanReminder[], today: string): ReminderBatch[] {
+/** Paling banyak hari terlewat yang disusulkan. */
+export const MAX_CATCH_UP_DAYS = 7;
+
+/**
+ * Hari terlewat yang disusulkan untuk satu kategori + Keperluan: hari-hari setelah kiriman sukses terakhir sampai kemarin
+ * (paling banyak 7). Belum pernah sukses (mis. reminder baru dinyalakan) = 0, supaya tidak ada banjir email.
+ */
+export function catchUpDays(lastSuccess: string | null | undefined, today: string): number {
+  if (!lastSuccess) return 0;
+  return Math.max(0, Math.min(MAX_CATCH_UP_DAYS, diffDays(lastSuccess, today) - 1));
+}
+
+/** Tanggal acuan yang ikut diperiksa: hari ini dan `back` hari sebelumnya (susulan). */
+export const checkDays = (today: string, back: number) => Array.from({ length: Math.max(0, back) + 1 }, (_, j) => addDays(today, -j));
+
+/**
+ * Kelompokkan client per kategori dan Keperluan pada tanggal `today`. Batch tanpa client tidak ikut.
+ * `back(type, keperluanId)` = jumlah hari terlewat yang disusulkan (lihat catchUpDays); kolom Hari berisi selisih sebenarnya.
+ */
+export function categorize(rows: ReminderSource[], keperluan: KeperluanReminder[], today: string, back: (type: ReminderType, keperluanId: number) => number = () => 0): ReminderBatch[] {
   const byKep = new Map<number, ReminderSource[]>();
   for (const r of rows) {
     const list = byKep.get(r.keperluanId);
@@ -81,7 +100,13 @@ export function categorize(rows: ReminderSource[], keperluan: KeperluanReminder[
     for (const k of keperluan) {
       const n = daysFor(type, k);
       if (n <= 0) continue;
-      const items = (byKep.get(k.id) ?? []).filter((r) => matches(type, r, n, today)).map((r) => ({ ...withoutExtra(r), days: n }));
+      const days = checkDays(today, back(type, k.id));
+      const sinceDate = ACCOUNTING_REMINDERS.includes(type); // invoice: hari sejak tanggal; lainnya: sisa hari
+      const items: ReminderItem[] = [];
+      for (const r of byKep.get(k.id) ?? []) {
+        const j = days.findIndex((d) => matches(type, r, n, d));
+        if (j >= 0) items.push({ ...withoutExtra(r), days: sinceDate ? n + j : n - j });
+      }
       if (items.length) out.push({ type, keperluanId: k.id, keperluanName: k.name.trim(), days: n, items });
     }
   }
