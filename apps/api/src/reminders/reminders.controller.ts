@@ -88,7 +88,10 @@ export class RemindersController {
 
   @Post('run')
   run(@Body() dto: RunReminderDto, @CurrentUser() user: AuthUser) {
-    return this.reminders.run(Boolean(dto.force), { userId: user.id, name: user.username });
+    const clean = (xs?: string[]) => [...new Set((xs ?? []).map((x) => x.trim()).filter(Boolean))];
+    const to = clean(dto.to);
+    const manual = to.length ? { to, cc: clean(dto.cc).filter((x) => !to.includes(x)) } : undefined;
+    return this.reminders.run(Boolean(dto.force), { userId: user.id, name: user.username }, manual);
   }
 
   @Post('reload-schedule')

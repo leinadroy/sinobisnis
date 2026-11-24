@@ -1,12 +1,18 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { REMINDER_TYPES, type ReminderType } from '@sml/shared';
 import { ListQueryDto } from '../common/list-query.dto.js';
 
 export class RunReminderDto {
   /** Kirim ulang walaupun kategori itu sudah terkirim hari ini. */
   @IsOptional() @IsBoolean() force?: boolean;
+  /**
+   * Kirim manual ke alamat tertentu (bukan Email Recipient): semua email dikirim ke `to` (+ `cc`), selalu dikirim
+   * walaupun sudah terkirim hari ini, dan tidak dihitung sebagai kiriman harian (jadwal/kirim biasa tetap jalan).
+   */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10) @IsEmail({}, { each: true, message: 'Format email To tidak valid.' }) to?: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @IsEmail({}, { each: true, message: 'Format email CC tidak valid.' }) cc?: string[];
 }
 
 export class TestEmailDto {

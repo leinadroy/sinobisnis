@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { d2s, dt2s, s2d } from '../common/dates.js';
 import { paginated } from '../common/list-query.dto.js';
 import {
-  addDays, buildBody, buildSubject, byType, categorize, catchUpDays, checkDays, daysFor, htmlTable, MAX_CATCH_UP_DAYS, logText, parseLog, recipientsFor, successPrefix,
+  addDays, buildBody, buildSubject, byType, categorize, catchUpDays, checkDays, daysFor, htmlTable, MAX_CATCH_UP_DAYS, logText, manualNote, MANUAL_SEND_MARK, parseLog, recipientsFor, successPrefix,
   type KeperluanReminder, type ReminderBatch, type ReminderSource,
 } from './reminder.logic.js';
 import type { ReminderLogQueryDto } from './reminders.dto.js';
@@ -51,13 +51,14 @@ export class RemindersService {
 
   /**
    * Tanggal (lokal) kiriman sukses terakhir per "kategori|Keperluan" dalam 8 hari terakhir, dari datalog — termasuk log
-   * aplikasi lama dan log "(0 items)" (hari itu sudah diperiksa).
+   * aplikasi lama dan log "(0 items)" (hari itu sudah diperiksa), tanpa kiriman manual ke alamat tertentu.
    */
   private async lastSuccess(today: string): Promise<Map<string, string>> {
     const [yy, mm, dd] = addDays(today, -(MAX_CATCH_UP_DAYS + 1)).split('-').map(Number);
     const rows = await this.prisma.dataLog.findMany({
       where: {
         tableName: REMINDER_LOG_TABLE, created: { gte: new Date(yy, mm - 1, dd) }, description: { startsWith: STATUS_PREFIX.SENT },
+        NOT: { description: { contains: MANUAL_SEND_MARK } },
       },
       select: { created: true, description: true },
     });
@@ -152,7 +153,7 @@ export class RemindersService {
    * Kirim satu email per kategori per Keperluan yang punya client hari ini. Kombinasi yang sudah tercatat
    * "Success" hari ini dilewati kecuali `force`. Setiap kiriman dicatat di datalog (TableName 'Reminder').
    */
-  async run(force = false, by: ReminderRunner = SYSTEM_RUNNER): Promise<ReminderRunResult[]> {
+  async run(force = false, by: ReminderRunner = SYSTEM_RUNNER, manual?: { to: string[]; cc: string[] }): Promise<ReminderRunResult[]> {
     if (this.prisma.activeProfile.readOnly) throw new ConflictException(`Database ${this.prisma.activeProfile.label} hanya baca: reminder tidak dikirim.`);
     if (this.running) throw new ConflictException('Reminder sedang dikirim. Tunggu sampai selesai.');
     this.running = true;
@@ -171,11 +172,13 @@ export class RemindersService {
         const s = summary.get(b.type) ?? { sent: 0, skipped: 0, notSent: 0, failed: 0, count: 0, notes: new Set<string>() };
         summary.set(b.type, s);
         s.count += b.items.length;
-        const already = !force && (await this.prisma.dataLog.count({
-          // Log "(0 items)" (aplikasi lama mencatat semua Keperluan tiap hari) bukan kiriman, jadi tidak dihitung.
+        const already = !force && !manual && (await this.prisma.dataLog.count({
+          // Log "(0 items)" (aplikasi lama mencatat semua Keperluan tiap hari) dan kiriman manual ke alamat tertentu
+          // bukan kiriman harian, jadi tidak dihitung.
           where: {
             tableName: REMINDER_LOG_TABLE, created: { gte: since },
-            description: { startsWith: successPrefix(b.type, b.keperluanName) }, NOT: { description: { contains: '(0 items)' } },
+            description: { startsWith: successPrefix(b.type, b.keperluanName) },
+            NOT: [{ description: { contains: '(0 items)' } }, { description: { contains: MANUAL_SEND_MARK } }],
           },
         }));
         if (already) { s.skipped++; continue; }
@@ -183,11 +186,13 @@ export class RemindersService {
         const tpl = templates.find((t) => t.id === REMINDER_TEMPLATE_ID[b.type]);
         const subject = buildSubject(tpl?.subject?.trim() || REMINDER_LABELS[b.type], b.keperluanName, b.items.length);
         const html = buildBody(tpl?.content ?? '', b.keperluanName, htmlTable(b.type, b.items, cfg['Site URL'] ?? ''));
-        const to = recipientsFor(b.type, recips);
+        const to = manual ? manual.to : recipientsFor(b.type, recips);
+        const cc = manual?.cc.length ? manual.cc : undefined;
         const log = (status: 'SENT' | 'FAILED' | 'NOT SENT', note: string | null) => this.prisma.dataLog.create({
           data: {
             tableName: REMINDER_LOG_TABLE, tableId: 0, userId: by.userId, created: new Date(), tableAction: '',
-            description: logText(status, b.type, b.keperluanName, b.items.length, by.name, note),
+            description: logText(status, b.type, b.keperluanName, b.items.length, by.name,
+              manual ? [manualNote(manual.to, manual.cc), note].filter(Boolean).join(' — ') : note),
           },
         });
 
@@ -198,7 +203,7 @@ export class RemindersService {
           continue;
         }
         try {
-          await tx.sendMail({ from, to, subject, html });
+          await tx.sendMail({ from, to, cc, subject, html });
           await log('SENT', null);
           s.sent++;
         } catch (e) {
@@ -214,7 +219,7 @@ export class RemindersService {
           .filter(Boolean).join(', ');
         return { type, status, count: s.count, note: [parts, ...s.notes].filter(Boolean).join(' — ') || null };
       });
-      this.logger.log(`run by ${by.name}${force ? ' (paksa)' : ''}: ${results.map((r) => `${r.type}=${r.status}`).join(', ') || 'tidak ada item'}`);
+      this.logger.log(`run by ${by.name}${force ? ' (paksa)' : ''}${manual ? ` (${manualNote(manual.to, manual.cc)})` : ''}: ${results.map((r) => `${r.type}=${r.status}`).join(', ') || 'tidak ada item'}`);
       return results;
     } finally {
       this.running = false;

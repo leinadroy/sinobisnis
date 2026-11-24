@@ -172,6 +172,10 @@ export function parseLog(text: string): ParsedLog {
   };
 }
 
+/** Penanda log kiriman manual ke alamat tertentu; tidak dihitung sebagai kiriman harian. */
+export const MANUAL_SEND_MARK = 'Kirim manual ke:';
+export const manualNote = (to: string[], cc: string[]) => `${MANUAL_SEND_MARK} ${to.join(', ')}${cc.length ? `; CC: ${cc.join(', ')}` : ''}`;
+
 /** Awalan teks log sukses untuk satu kategori + Keperluan (dipakai mencegah kirim dua kali sehari). */
 export const successPrefix = (type: ReminderType, keperluan: string) => `Success Run ${REMINDER_LOG_PREFIX[type]} ${keperluan}(`;
 

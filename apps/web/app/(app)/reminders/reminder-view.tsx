@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
-import { AlertTriangle, Bell, CalendarClock, CheckCircle2, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
+import { AlertTriangle, Bell, CalendarClock, CheckCircle2, Mail, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
   REMINDER_DAY_LABELS, REMINDER_LABELS, REMINDER_TYPES,
@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SearchSelect } from "@/components/ui/search-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/data-table/data-table";
@@ -33,6 +35,10 @@ function StatusBadge({ status }: { status: string | null }) {
   return <span className={cn("inline-flex h-5 items-center rounded-4xl px-2 text-xs font-medium whitespace-nowrap", STATUS_TONE[status ?? ""] ?? "bg-muted")}>{status}</span>;
 }
 
+/** "a@x.com, b@y.com" / satu per baris → daftar alamat. */
+const emails = (s: string) => [...new Set(s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean))];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const summarize = (rs: ReminderRunResult[]) =>
   rs.length ? rs.map((r) => `${REMINDER_LABELS[r.type]}: ${r.status}${r.note ? ` (${r.note})` : ""}`).join(" • ") : "Tidak ada client yang perlu direminder.";
 
@@ -41,11 +47,17 @@ export function ReminderStatus({ overview, canRun, canConfigure }: { overview: R
   const router = useRouter();
   const [pending, start] = useTransition();
   const [confirmForce, setConfirmForce] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTo, setManualTo] = useState("");
+  const [manualCc, setManualCc] = useState("");
   const { schedule, smtpConfigured, recipients } = overview;
+  const toList = emails(manualTo), ccList = emails(manualCc);
+  const badEmail = [...toList, ...ccList].find((e) => !EMAIL_RE.test(e));
 
-  const run = (force: boolean) => start(async () => {
-    const res = await runReminders(force);
+  const run = (force: boolean, to?: string[], cc?: string[]) => start(async () => {
+    const res = await runReminders(force, to, cc);
     setConfirmForce(false);
+    setManualOpen(false);
     if (!res.ok) return void toast.error(res.error);
     const bad = res.data!.some((r) => r.status === "FAILED" || r.status === "NOT SENT");
     toast[bad ? "warning" : "success"](summarize(res.data!), { duration: 10_000 });
@@ -86,12 +98,43 @@ export function ReminderStatus({ overview, canRun, canConfigure }: { overview: R
             <>
               <Button onClick={() => run(false)} disabled={pending}><Send /> {pending ? "Mengirim…" : "Kirim reminder sekarang"}</Button>
               <Button variant="outline" onClick={() => setConfirmForce(true)} disabled={pending} title="Kirim ulang walaupun sudah terkirim hari ini"><RotateCcw /> Kirim ulang (paksa)</Button>
+              <Button variant="outline" onClick={() => setManualOpen(true)} disabled={pending} title="Kirim semua reminder hari ini ke alamat tertentu (To + CC), bukan ke Email Recipient"><Mail /> Kirim ke alamat tertentu</Button>
               <Button variant="outline" onClick={reload} disabled={pending}><RefreshCw /> Muat ulang jadwal</Button>
             </>
           )}
           {canConfigure && <Button variant="ghost" nativeButton={false} render={<Link href="/developer/system-config" />}><Settings /> Pengaturan</Button>}
         </div>
       </CardContent>
+      <AlertDialog open={manualOpen} onOpenChange={setManualOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kirim reminder ke alamat tertentu</AlertDialogTitle>
+            <AlertDialogDescription>
+              Semua kategori & Keperluan yang punya client hari ini dikirim ke alamat di bawah (bukan ke Email Recipient), walaupun sudah terkirim hari ini.
+              Kiriman ini tercatat di log, tapi tidak menghalangi kirim reminder biasa / terjadwal.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="manual-to">To</Label>
+              <Input id="manual-to" value={manualTo} onChange={(e) => setManualTo(e.target.value)} placeholder="nama@contoh.com, nama2@contoh.com" autoComplete="off" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="manual-cc">CC (opsional)</Label>
+              <Input id="manual-cc" value={manualCc} onChange={(e) => setManualCc(e.target.value)} placeholder="nama@contoh.com" autoComplete="off" />
+            </div>
+            {badEmail && <p className="text-sm text-destructive">Format email tidak valid: {badEmail}</p>}
+            <p className="text-xs text-muted-foreground">Pisahkan beberapa alamat dengan koma. Maks. 10 alamat per kolom.</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Batal</AlertDialogCancel>
+            <AlertDialogAction disabled={pending || !toList.length || !!badEmail || toList.length > 10 || ccList.length > 10}
+              onClick={() => run(false, toList, ccList)}>
+              <Send /> {pending ? "Mengirim…" : "Kirim"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={confirmForce} onOpenChange={setConfirmForce}>
         <AlertDialogContent>
           <AlertDialogHeader>
