@@ -517,15 +517,18 @@ export class InvoicesService {
     if (toStatus(inv.status) !== 'DRAFT' && !canEdit(user.access, 'invoices.requests')) throw new ForbiddenException('Hanya invoice DRAFT yang bisa dihapus.');
     const members = new Set((await this.groups(inv)).flatMap((g) => g.clients.map((c) => c.clientId)).filter((x): x is number => !!x));
     const owned = await this.ownedClients(inv, members);
-    await this.prisma.$transaction([
-      this.prisma.client.updateMany({ where: { no: { in: owned.map(BigInt) } }, data: { noInvoice: null, tanggalInvoice: null, tanggalPembayaranInvoice: null } }),
-      this.prisma.invoiceDetail.deleteMany({ where: { invoiceId: id } }),
-      this.prisma.invoiceTax.deleteMany({ where: { invoiceId: id } }),
-      this.prisma.invoiceAttachment.deleteMany({ where: { invoiceId: id } }),
-      this.prisma.updateRequest.deleteMany({ where: { invoiceId: inv.id } }),
-      this.prisma.printQueue.deleteMany({ where: { invoiceId: inv.id } }),
-      this.prisma.invoice.delete({ where: { id: inv.id } }),
-    ]);
+    await this.prisma.$transaction(async (tx) => {
+      // InvoiceAttachmentInvoiceId tidak berindeks dan tabel ini berisi BLOB besar.
+      // Ambil hanya primary key, lalu hapus lewat indeks; bila kosong, lewati DELETE seluruh tabel.
+      const attachments = await tx.invoiceAttachment.findMany({ where: { invoiceId: id }, select: { id: true } });
+      await tx.client.updateMany({ where: { no: { in: owned.map(BigInt) } }, data: { noInvoice: null, tanggalInvoice: null, tanggalPembayaranInvoice: null } });
+      await tx.invoiceDetail.deleteMany({ where: { invoiceId: id } });
+      await tx.invoiceTax.deleteMany({ where: { invoiceId: id } });
+      if (attachments.length) await tx.invoiceAttachment.deleteMany({ where: { id: { in: attachments.map((a) => a.id) } } });
+      await tx.updateRequest.deleteMany({ where: { invoiceId: inv.id } });
+      await tx.printQueue.deleteMany({ where: { invoiceId: inv.id } });
+      await tx.invoice.delete({ where: { id: inv.id } });
+    }, { maxWait: 10_000, timeout: 120_000 });
     for (const c of owned) await this.clients.log(user.id, c, 'InvoiceRemove');
   }
 
