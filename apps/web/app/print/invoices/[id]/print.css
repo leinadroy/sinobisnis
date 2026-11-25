@@ -44,11 +44,11 @@
 .sml .sum td.pad { border-left: var(--line) solid #000; }
 .sml .sum td.pad.end { border-bottom: var(--line) solid #000; }
 .sml .boxes { display: flex; gap: 18px; margin-top: 22px; page-break-inside: avoid; }
-.sml .box-wrap { flex: 1; }
+.sml .box-wrap { flex: 1; min-width: 0; }
 .sml .t { margin-bottom: 2px; }
 .sml .box { border: 1px solid #333; background: #fdf8f6; min-height: 100px; padding: 12px 14px; }
 .sml .info { white-space: pre-line; font-size: 11px; letter-spacing: .2px; line-height: 1.35; }
-.sml .words { font-weight: 700; font-style: italic; font-size: 13.5px; line-height: 1.35; }
+.sml .words { font-weight: 700; font-style: italic; font-size: 13.5px; line-height: 1.35; overflow-wrap: anywhere; }
 .sml .pay { margin-top: 20px; page-break-inside: avoid; }
 .sml .pay .box { min-height: 0; }
 .sml .bank td { padding: 1px 6px 1px 0; vertical-align: top; }
@@ -138,6 +138,8 @@
 @media print {
   .invoice-print { background: #fff; min-height: 0; }
   .invoice-print .page { width: auto; margin: 0; padding: 0; box-shadow: none; }
+  /* Sisakan ruang dari tepi cetak supaya border kanan kotak SML tidak terpotong. */
+  .invoice-print .page.sml { padding-right: 2mm; }
   .rts .head { margin: 0 -4mm 2mm; }
   .jcss .bar { margin-left: -12mm; margin-right: -12mm; }
 }
